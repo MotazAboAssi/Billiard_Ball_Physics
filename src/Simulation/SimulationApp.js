@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import GUI from 'lil-gui';
-import { PhysicsWorld, PhysicalBall } from './../PhysicsWorld.js';
+import { PhysicsWorld, PhysicalBall } from '../Physic/';
 import { WindBlowForce, MagneticCueBallForce } from './../IExternalForce.js';
 import { TableGraphics } from './TableGraphics.js';
 import { CueStickManager } from './CueStickManager.js';
@@ -31,20 +31,10 @@ export class SimulationApp {
         this.initGUI();
         this.initControlsInteraction();
 
-
-        // استدعاء دالة واجهة التحكم المحدثة هنا:
-        this.initPhysicsGUI();
-
         this.lastTime = performance.now();
         window.requestAnimationFrame(this.animate);
 
         window.requestAnimationFrame(this.animate);
-
-        // مثال لتعديل مرونة حواف المطاط أو تفعيل خشونة قماش الطاولة مباشرة أثناء حركة الكرات:
-        this.physicsWorld.updateParameters({
-            mu_sliding: 0.25,   // تغيير معامل احتكاك قماش الطاولة فواً
-            e_cushion: 0.82     // زيادة مرونة وارتداد المطاط للحواف
-        });
     }
 
     initPhysicsWorld() {
@@ -240,34 +230,69 @@ export class SimulationApp {
     }
 
     initGUI() {
+        // 1. استخدام نفس اللوحة الرئيسية الحالية لديك
         this.gui = new GUI({ title: '🕹️ لوحة هندسة القوانين الفيزيائية' });
         const config = this.physicsWorld.config;
 
+        // 2. مجلد التحكم بالعصا والضربة (مدمج مع أحداث التحديث اللحظي)
         const fStrike = this.gui.addFolder('🏑 التحكم بالعصا والضربة');
-        fStrike.add(config, 'strikeImpulse', 0.1, 5.0, 0.05).name('دفع الضربة (Impulse)');
-        fStrike.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001).name('انحراف أفقي (X Offset)');
-        fStrike.add(config, 'strikeOffsetY', -0.02, 0.02, 0.001).name('انحراف رأسي (Y Offset)');
+        fStrike.add(config, 'strikeImpulse', 0.1, 5.0, 0.05)
+            .name('دفع الضربة (Impulse)')
+            .onChange(value => this.physicsWorld.updateParameters({ strikeImpulse: value }));
+            
+        fStrike.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001)
+            .name('انحراف أفقي (X Offset)')
+            .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetX: value }));
+            
+        fStrike.add(config, 'strikeOffsetY', -0.02, 0.02, 0.001)
+            .name('انحراف رأسي (Y Offset)')
+            .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetY: value }));
+            
         fStrike.add(this, 'triggerAdvancedStrike').name('🚀 إطلاق القوة');
         fStrike.open();
 
+        // 3. مجلد البيئة والاحتكاك السطحي (تحديث فوري لمعادلات الانزلاق والتدحرج النقي)
         const fEnvironment = this.gui.addFolder('🌍 البيئة والاحتكاك السطحي');
-        fEnvironment.add(config, 'gravity', 0.0, 25.0, 0.1).name('الجاذبية (g)');
-        fEnvironment.add(config, 'mu_sliding', 0.0, 0.8, 0.01).name('احتكاك الانزلاق (Sliding)');
-        fEnvironment.add(config, 'mu_rolling', 0.0, 0.1, 0.001).name('احتكاك التدحرج (Rolling)');
-        fEnvironment.add(config, 'k_air', 0.0, 0.05, 0.001).name('مقاومة الهواء (Air)');
-        fEnvironment.add(config, 'sleepThreshold', 0.00001, 0.01, 0.000001).name('عتبة سكون الكرة (Energy)');
+        fEnvironment.add(config, 'gravity', 0.0, 25.0, 0.1)
+            .name('الجاذبية (g)')
+            .onChange(value => this.physicsWorld.updateParameters({ gravity: value }));
+            
+        fEnvironment.add(config, 'mu_sliding', 0.0, 0.8, 0.01)
+            .name('احتكاك الانزلاق (Sliding)')
+            .onChange(value => this.physicsWorld.updateParameters({ mu_sliding: value }));
+            
+        fEnvironment.add(config, 'mu_rolling', 0.0, 0.1, 0.001)
+            .name('احتكاك التدحرج (Rolling)')
+            .onChange(value => this.physicsWorld.updateParameters({ mu_rolling: value }));
+            
+        fEnvironment.add(config, 'k_air', 0.0, 0.05, 0.001)
+            .name('مقاومة الهواء (Air)')
+            .onChange(value => this.physicsWorld.updateParameters({ k_air: value }));
+            
+        fEnvironment.add(config, 'sleepThreshold', 0.00001, 0.01, 0.000001)
+            .name('عتبة سكون الكرة (Energy)')
+            .onChange(value => this.physicsWorld.updateParameters({ sleepThreshold: value }));
 
+        // 4. مجلد مرونة التصادمات بناءً على اشتقاقات دراسة الـ .md المرفقة
         const fCollisions = this.gui.addFolder('💥 مرونة التصادمات (Restitution)');
-        fCollisions.add(config, 'e_ball', 0.0, 1.0, 0.01).name('مرونة كرة مع كرة');
-        fCollisions.add(config, 'e_cushion', 0.0, 1.0, 0.01).name('مرونة حواف الطاولة');
-        fCollisions.add(config, 'cushion_friction', 0.0, 1.0, 0.05).name('احتكاك الكرة بالحافة');
+        fCollisions.add(config, 'e_ball', 0.0, 1.0, 0.01)
+            .name('مرونة كرة مع كرة')
+            .onChange(value => this.physicsWorld.updateParameters({ e_ball: value }));
+            
+        fCollisions.add(config, 'e_cushion', 0.0, 1.0, 0.01)
+            .name('مرونة حواف الطاولة')
+            .onChange(value => this.physicsWorld.updateParameters({ e_cushion: value }));
+            
+        fCollisions.add(config, 'cushion_friction', 0.0, 1.0, 0.05)
+            .name('احتكاك الكرة بالحافة')
+            .onChange(value => this.physicsWorld.updateParameters({ cushion_friction: value }));
 
+        // 5. ربط القوانين الخارجية الحالية (الرياح والحقل المغناطيسي) باللوحة الموحدة تلقائياً
         this.physicsWorld.registeredForces.forEach(force => {
             const folder = this.gui.addFolder(`🔧 قانون خارجي: ${force.name}`);
             force.setupGUI(folder);
             folder.close();
         });
-
     }
 
     animate(timestamp) {
