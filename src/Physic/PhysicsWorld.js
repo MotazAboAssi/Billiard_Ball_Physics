@@ -1,28 +1,24 @@
 import * as THREE from 'three';
-import {PhysicalBall} from './PhysicalBall'
+import * as Physics from './PhysicsLaws.js';
+import { PhysicalBall } from './PhysicalBall';
 
-
-/**
- * كلاس العالم الفيزيائي - يدير تصادم الكرات وتفاعلها مع الجدران والمطاط
- */
 export class PhysicsWorld {
     constructor() {
         this.balls = [];
         this.registeredForces = [];
 
-        // واجهة التحكم الشاملة بالثوابت الفيزيائية (تغطي المتطلبات 4 و 5 بالكامل)
         this.config = {
-            gravity: 9.81,          // الجاذبية الأرضية g
-            mu_sliding: 0.20,       // معامل احتكاك الانزلاق للقماش mu_k
-            mu_rolling: 0.015,      // معامل مقاومة التدحرج mu_r
-            k_air: 0.005,           // معامل مقاومة الهواء
-            e_ball: 0.96,           // معامل الارتداد بين الكرات e
-            e_cushion: 0.75,        // معامل ارتداد الحائط المطاطي ec (الدراسة - قسم البند 1)
-            cushion_friction: 0.2,  // معامل احتكاك المطاط المماسي mu_c (الدراسة - قسم البند 2)
-            sleepThreshold: 0.006,  // عتبة التحول للسكون الثابت
-            strikeImpulse: 0.9,     // قوة نبضة العصا الافتراضية J
-            strikeOffsetX: 0.0,     // الانحراف الأفقي للضربة
-            strikeOffsetY: 0.0      // الانحراف الرأسي للضربة
+            gravity: 9.81,
+            mu_sliding: 0.20,
+            mu_rolling: 0.015,
+            k_air: 0.005,
+            e_ball: 0.96,
+            e_cushion: 0.75,
+            cushion_friction: 0.2,
+            sleepThreshold: 0.006,
+            strikeImpulse: 0.9,
+            strikeOffsetX: 0.0,
+            strikeOffsetY: 0.0
         };
 
         this.tableBounds = { minX: -0.635, maxX: 0.635, minZ: -1.27, maxZ: 1.27 };
@@ -39,40 +35,23 @@ export class PhysicsWorld {
         this.balls.push(ball);
     }
 
-    /**
-     * دالة تحديث الثوابت الفيزيائية أثناء التشغيل (تلبية للمطلوب رقم 4 بدقة)
-     * يمكن ربطها مباشرة بشرائح التمرير (Sliders) في واجهة المستخدم لديك
-     */
     updateParameters(newParams) {
         this.config = { ...this.config, ...newParams };
     }
+
     registerExternalForce(forceInstance) {
         this.registeredForces.push(forceInstance);
     }
-
-    // getTotalKineticEnergy() {
-    //     return this.balls.reduce((sum, ball) => sum + (ball.isPocketted ? 0 : ball.getKineticEnergy()), 0);
-    // }
 
     getTotalKineticEnergy() {
         let totalEnergy = 0;
         for (let ball of this.balls) {
             if (!ball.isPocketted && !ball.isSleeping) {
-                // الطاقة الخطية: 0.5 * m * v^2
-                const vSq = ball.velocity.lengthSq();
-                const linearEnergy = 0.5 * ball.mass * vSq;
-
-                // عزم القصور الذاتي للكرة المصمتة: I = (2/5) * m * r^2
-                const I = 0.4 * ball.mass * ball.radius * ball.radius;
-                const wSq = ball.angularVelocity.lengthSq();
-                const rotationalEnergy = 0.5 * I * wSq;
-
-                totalEnergy += (linearEnergy + rotationalEnergy);
+                totalEnergy += ball.getKineticEnergy();
             }
         }
         return totalEnergy;
     }
-
 
     update(dt) {
         for (let ball of this.balls) {
@@ -80,21 +59,17 @@ export class PhysicsWorld {
             ball.applyStandardFriction(this.config, dt);
         }
         this.resolveBallCollisions();
-        this.resolveCushionCollisions();
+        this.resolveCushionCollisions(); // الآن يتضمن الاحتكاك المماسي العام + spin
         this.checkPocketCollisions();
     }
 
-    /**
-     * هندسة الصدم المرن المتبادل وسلاسل القوة وتضاؤل الطاقة التراكمي
-     * يطبق قوانين حفظ الزخم والطاقة، وقاعدة الـ 90 درجة، والاضمحلال الهندسي (قسم تصادم الكرات)
-     */
     resolveBallCollisions() {
         for (let i = 0; i < this.balls.length; i++) {
             for (let j = i + 1; j < this.balls.length; j++) {
-                const b1 = this.balls[i]; const b2 = this.balls[j];
+                const b1 = this.balls[i];
+                const b2 = this.balls[j];
                 if (b1.isPocketted || b2.isPocketted) continue;
 
-                // حساب خط المراكز (The Line of Centers) والمحور الناظم المشترك (الدراسة - هندسة التلامس)
                 const delta = new THREE.Vector3().subVectors(b2.position, b1.position);
                 delta.y = 0;
                 const distance = delta.length();
@@ -102,29 +77,25 @@ export class PhysicsWorld {
 
                 if (distance < minDistance) {
                     const normal = delta.clone().normalize();
-
-                    // حل مشكلة التداخل الهندسي المجهري لمنع التداخلات غير الفيزيائية (Signorini conditions)
                     const penetration = minDistance - distance;
                     const correction = normal.clone().multiplyScalar((penetration / (b1.inverseMass + b2.inverseMass)) * 0.8);
                     b1.position.addScaledVector(correction, -b1.inverseMass);
                     b2.position.addScaledVector(correction, b2.inverseMass);
 
-                    // حساب تفاضل السرعات اللحظية على طول المحور الناظم المشترك
                     const relativeVelocity = new THREE.Vector3().subVectors(b2.velocity, b1.velocity);
                     const velAlongNormal = relativeVelocity.dot(normal);
+                    if (velAlongNormal > 0) continue;
 
-                    if (velAlongNormal > 0) continue; // الكرات تبتعد بالفعل
-
-                    // حساب نبضة الصدم الفعالة بإدخال معامل ارتداد الكرات التبادلي الواقعي (e < 1)
-                    // العلاقة المستنتجة رياضياً لتغير الطاقة: Delta K = 1/4 * m * (1 - e^2) * v_rel^2 (الدراسة - التبدد التراكمي)
-                    let jImpulse = -(1 + this.config.e_ball) * velAlongNormal / (b1.inverseMass + b2.inverseMass);
+                    // استخدام قانون النبضة من PhysicsLaws
+                    const jImpulse = Physics.collisionImpulseMagnitude(
+                        velAlongNormal,
+                        this.config.e_ball,
+                        b1.inverseMass,
+                        b2.inverseMass
+                    );
                     const impulse = normal.clone().multiplyScalar(jImpulse);
-
-                    // توزيع الزخم المرتد على الكرات المتصادمة (حفظ كمية الحركة وقاعدة الـ 90 درجة)
                     b1.velocity.addScaledVector(impulse, -b1.inverseMass);
                     b2.velocity.addScaledVector(impulse, b2.inverseMass);
-
-                    // الاستجابة للتصادم غير المركزي وسلاسل القوة (إيقاظ الكرات من السكون لتتجاوز عتبة القماش)
                     b1.isSleeping = false;
                     b2.isSleeping = false;
                 }
@@ -132,50 +103,91 @@ export class PhysicsWorld {
         }
     }
 
-    /**
-     * معالجة ارتداد الحواف المطاطية المقترن بالدوران والـ Spin
-     * يطبق معادلات التصادم العمودي والمائل وتأثير الدوران الجانبي (الدراسة - ديناميكا التصادم مع الجدران المطاطية)
-     */
     resolveCushionCollisions() {
-        const e_c = this.config.e_cushion;        // معامل الارتداد ec
-        const mu_c = this.config.cushion_friction;  // معامل احتكاك المطاط muc
+        const e_c = this.config.e_cushion;
+        const mu_c = this.config.cushion_friction;
 
         for (let ball of this.balls) {
             if (ball.isSleeping || ball.isPocketted) continue;
             let hit = false;
-            let normal = new THREE.Vector3(); // المتجه الناظمي العمودي على الجدار المصدوم
+            let normal = new THREE.Vector3();
 
-            // فحص الحدود الطاولية الأربعة وتغيير السرعة العمودية: v_out,n = -ec * v_in,n (الدراسة - البند 1)
+            // التعامل مع الحدود الأربعة (كل جدار على حدة)
+            // نعالج كل تصادم بشكل فردي لضمان تطبيق الاحتكاك المماسي الصحيح
             if (ball.position.x - ball.radius < this.tableBounds.minX) {
-                ball.position.x = this.tableBounds.minX + ball.radius; ball.velocity.x = -ball.velocity.x * e_c; normal.set(1, 0, 0); hit = true;
+                ball.position.x = this.tableBounds.minX + ball.radius;
+                this.applyCushionCollision(ball, new THREE.Vector3(1, 0, 0), e_c, mu_c);
+                hit = true;
             } else if (ball.position.x + ball.radius > this.tableBounds.maxX) {
-                ball.position.x = this.tableBounds.maxX - ball.radius; ball.velocity.x = -ball.velocity.x * e_c; normal.set(-1, 0, 0); hit = true;
+                ball.position.x = this.tableBounds.maxX - ball.radius;
+                this.applyCushionCollision(ball, new THREE.Vector3(-1, 0, 0), e_c, mu_c);
+                hit = true;
             }
             if (ball.position.z - ball.radius < this.tableBounds.minZ) {
-                ball.position.z = this.tableBounds.minZ + ball.radius; ball.velocity.z = -ball.velocity.z * e_c; normal.set(0, 0, 1); hit = true;
+                ball.position.z = this.tableBounds.minZ + ball.radius;
+                this.applyCushionCollision(ball, new THREE.Vector3(0, 0, 1), e_c, mu_c);
+                hit = true;
             } else if (ball.position.z + ball.radius > this.tableBounds.maxZ) {
-                ball.position.z = this.tableBounds.maxZ - ball.radius; ball.velocity.z = -ball.velocity.z * e_c; normal.set(0, 0, -1); hit = true;
+                ball.position.z = this.tableBounds.maxZ - ball.radius;
+                this.applyCushionCollision(ball, new THREE.Vector3(0, 0, -1), e_c, mu_c);
+                hit = true;
             }
 
             if (hit) {
                 ball.isSleeping = false;
-
-                // [تأثير الدوران المغزلي المقترن - Cushion Coupling]: (الدراسة - البند 3)
-                // سرعة نقطة التماس الميكانيكية اللحظية مع الجدار المطاطي: vc = vt + w x R
-                const effectVelocity = ball.angularVelocity.y * ball.radius;
-
-                if (Math.abs(effectVelocity) > 0.01) {
-                    // الدوران الجانبي (Spin) يولد قوة احتكاك مماسية تحرف زاوية الخروج الحقيقية (البند 2 و 3)
-                    // طاقة الدوران تنتقل وتتحرك كدفع إضافي للمركبة المماسية الموازية للجدار المطاطي
-                    ball.velocity.addScaledVector(new THREE.Vector3(-normal.z, 0, normal.x), effectVelocity * mu_c);
-                }
             }
         }
     }
 
     /**
-     * التحقق من السقوط الميكانيكي داخل الحفر أو الوقوع تحت تأثير قوة سحب الجاذبية للحافة
+     * تطبيق تصادم الجدار مع احتساب:
+     * 1. الارتداد العمودي (قانون نيوتن مع e_cushion)
+     * 2. الاحتكاك المماسي العام (بدون spin) لتغيير زاوية الخروج
+     * 3. تأثير الدوران المغزلي (spin coupling) الذي يعدل السرعة المماسية إضافياً
      */
+    applyCushionCollision(ball, normal, e_c, mu_c) {
+    // 1. تفكيك السرعة الخطية إلى مركبة عمودية ومماسية
+    const vn = ball.velocity.dot(normal);
+    const vt = ball.velocity.clone().sub(normal.clone().multiplyScalar(vn));
+    
+    // 2. الارتداد العمودي (معامل الارتداد الطبيعي)
+    const vn_out = -e_c * vn;
+    
+    // 3. حساب السرعة المماسية بعد التصادم
+    //    نطبق احتكاكاً بسيطاً: السرعة المماسية تقل بنسبة (1 - mu_c) ولا تنعكس
+    //    هذا يمنع اكتساب سرعة وهمية ويحافظ على الزخم
+    let vt_out = vt.clone().multiplyScalar(1 - mu_c);
+    
+    // 4. التعامل مع الدوران المغزلي (spin) بشكل صحيح
+    //    يجب ألا نضيف سرعة خطية مباشرة، بل نعدل السرعة الزاوية فقط (يستهلك الاحتكاك جزءاً من الدوران)
+    //    ونضيف تأثيراً بسيطاً جداً على vt_out يعادل تبادل الزخم الزاوي مع الخطي (مقادير صغيرة جداً)
+    const r = ball.radius;
+    const spinY = ball.angularVelocity.y;
+    
+    if (Math.abs(spinY) > 1e-4) {
+        // تقدير السرعة الخطية التي قد تنتج عن تحول جزء صغير من spin إلى حركة خطية
+        // لكن بمعامل تخميد كبير جداً لتجنب التسارع الوهمي
+        // في الواقع، نقل spin إلى حركة خطية يحدث عبر الاحتكاك، وهو بالفعل ضمن mu_c
+        // لذلك نكتفي بتقليل spin تدريجياً
+        ball.angularVelocity.y *= (1 - mu_c * 0.5);
+        
+        // إضافة تأثير بسيط جداً على vt_out عند الجدران الجانبية (يحاكي دوران الكرة على الحافة)
+        // هذا الجزء اختياري ويمكن إزالته إذا استمرت المشكلة
+        if (Math.abs(normal.x) > 0.5) {
+            // جدار جانبي، التأثير على المحور Z
+            const influence = spinY * r * mu_c * 0.1;
+            vt_out.z += influence;
+        } else if (Math.abs(normal.z) > 0.5) {
+            // جدار أمامي/خلفي، التأثير على المحور X
+            const influence = spinY * r * mu_c * 0.1;
+            vt_out.x += influence;
+        }
+    }
+    
+    // 5. إعادة تركيب السرعة النهائية
+    ball.velocity.copy(vt_out.clone().add(normal.clone().multiplyScalar(vn_out)));
+}
+
     checkPocketCollisions() {
         for (let ball of this.balls) {
             if (ball.isPocketted) continue;
@@ -189,12 +201,10 @@ export class PhysicsWorld {
                 if (dist2D < gravityThreshold) {
                     ball.isSleeping = false;
                     if (dist2D > this.pocketRadius) {
-                        // محاكاة تسارع قماش الحافة المائل الذي يسحب الكرة باتجاه مركز الحفرة وعمقها
                         const pullForce = 21.0;
                         ball.velocity.x += (distX / dist2D) * pullForce * 0.008;
                         ball.velocity.z += (distZ / dist2D) * pullForce * 0.008;
                     } else {
-                        // استقرار الكرة داخل الحفرة بالكامل وتعطيل خواصها الحركية والفيزياوية
                         ball.isPocketted = true;
                         ball.velocity.set(0, 0, 0);
                         ball.angularVelocity.set(0, 0, 0);
