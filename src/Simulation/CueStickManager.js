@@ -103,42 +103,28 @@ export class CueStickManager {
             const offset = THREE.MathUtils.lerp(0.15, 0.0, t);
             this.cueMesh.position.set(0, 0, this.ctx.ballRadius + offset);
 
-        } else {
-            // 3. لحظة الاصطدام الفعلي بالكرة البيضاء (تنفذ مرة واحدة عند نهاية الأنيميشن)
-            this.isStrikingAnimation = false;
-            this.cueMesh.visible = false; // إخفاء العصا بعد الضربة حتى تسكن الكرات تماماً
+        // ابحث عن دالة animateStrike داخل ملف CueStickManager.js وقم باستبدال الجزء الأخير (مرحلة الاصطدام الفعلي) بهذا الكود:
 
-            const config = this.ctx.physicsWorld.config;
-            const impulseMag = config.strikeImpulse;
+    } else {
+        // 3. لحظة الاصطدام الفعلي بالكرة البيضاء (تنفذ مرة واحدة عند نهاية الأنيميشن البصري)
+        this.isStrikingAnimation = false;
+        this.cueMesh.visible = false; // إخفاء العصا بعد الضرب فوراً لحين سكون الكرات
 
-            // حساب ناقل الاتجاه الأمامي للعصا في الفضاء الثنائي الأفقي (X, Z) بناءً على زاوية التصويب الحالية
-            const cosA = Math.cos(this.cueAngle);
-            const sinA = Math.sin(this.cueAngle);
-            const strikeDirection = new THREE.Vector3(-sinA, 0, -cosA).normalize();
+        const config = this.ctx.physicsWorld.config;
+        
+        // حساب ناقل اتجاه الضرب الأمامي للعصا بناءً على زاوية التصويب الحالية
+        const cosA = Math.cos(this.cueAngle);
+        const sinA = Math.sin(this.cueAngle);
+        const strikeDirection = new THREE.Vector3(-sinA, 0, -cosA).normalize();
 
-            // تطبيق الدفع الخطي الأساسي لإيقاظ وتحريك الكرة البيضاء
-            const linearImpulse = strikeDirection.clone().multiplyScalar(impulseMag);
-            cueBall.isSleeping = false;
-            cueBall.velocity.addScaledVector(linearImpulse, cueBall.inverseMass);
-
-            // حساب مقلوب عزم القصور الذاتي للكرة المصمتة: I = 0.4 * m * r^2
-            const inverseInertia = 1.0 / (0.4 * cueBall.mass * cueBall.radius * cueBall.radius);
-
-            // أ: تأثير الانحراف الأفقي (Spin / English الجانبي) -> دوران حول المحور الرأسي Y
-            if (Math.abs(config.strikeOffsetX) > 0.0001) {
-                const sideSpinImpulse = config.strikeOffsetX * impulseMag;
-                const angularImpulseY = sideSpinImpulse * inverseInertia;
-                cueBall.angularVelocity.y += angularImpulseY;
-            }
-
-            // ب: تأثير الانحراف الرأسي (Top/Back Spin) -> دوران موازي لاتجاه مماس العصا الديناميكي
-            if (Math.abs(config.strikeOffsetY) > 0.0001) {
-                // ناقل الحركة العمودي المشتق من زاوية العصا الحالية ليكون التأثير متوافقاً مع أي زاوية ضرب
-                const tangentDirection = new THREE.Vector3(-cosA, 0, sinA).normalize();
-                const verticalSpinImpulse = config.strikeOffsetY * impulseMag;
-                cueBall.angularVelocity.addScaledVector(tangentDirection, verticalSpinImpulse * inverseInertia);
-            }
-        }
+        // استدعاء دالة الفيزياء المتطورة والمطابقة للدراسة النظرية وتمرير قيم الانحراف (Offsets)
+        cueBall.applyAdvancedStrike(
+            config.strikeImpulse, 
+            strikeDirection, 
+            config.strikeOffsetX, 
+            config.strikeOffsetY
+        );
+    }
     }
 
 

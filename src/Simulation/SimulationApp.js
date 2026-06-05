@@ -31,13 +31,26 @@ export class SimulationApp {
         this.initGUI();
         this.initControlsInteraction();
 
+
+        // استدعاء دالة واجهة التحكم المحدثة هنا:
+        this.initPhysicsGUI();
+
+        this.lastTime = performance.now();
         window.requestAnimationFrame(this.animate);
+
+        window.requestAnimationFrame(this.animate);
+
+        // مثال لتعديل مرونة حواف المطاط أو تفعيل خشونة قماش الطاولة مباشرة أثناء حركة الكرات:
+        this.physicsWorld.updateParameters({
+            mu_sliding: 0.25,   // تغيير معامل احتكاك قماش الطاولة فواً
+            e_cushion: 0.82     // زيادة مرونة وارتداد المطاط للحواف
+        });
     }
 
     initPhysicsWorld() {
         const ballGeo = new THREE.SphereGeometry(this.ballRadius, 32, 32);
 
-        // 1️⃣ أولاً: تهيئة الكرة البيضاء في مكانها الطبيعي (منطقة الـ Kitchen)
+        // 1. تهيئة الكرة البيضاء في مكانها السليم
         const cueBallPhys = new PhysicalBall(0, new THREE.Vector3(0, this.ballRadius, this.tableLength / 4), this.ballRadius, this.ballMass);
         const cueBallMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1 }));
         cueBallMesh.castShadow = true;
@@ -45,87 +58,129 @@ export class SimulationApp {
         this.physicsWorld.addBall(cueBallPhys);
         this.ballMeshes.push({ physics: cueBallPhys, mesh: cueBallMesh });
 
-        // 2️⃣ ثانياً: مصفوفة البيانات الدقيقة للـ 15 كرة (الأرقام، الألوان، ونوع التصميم السادة/المخطط)
-        // تم ترتيبها تماماً كما تظهر في صفوف الصورة من الرأس إلى القاعدة
+        // 2. مصفوفة البيانات الدقيقة للـ 15 كرة (الأرقام، الألوان، ونوع التصميم السادة/المخطط) متوافقة مع الصورة
         const rackData = [
-            // الصف الأول (الرأس)
-            { id: 9, color: 0xffcc00, isStriped: true },  // كرة 9 صفراء مخططة
-
-            // الصف الثاني
-            { id: 7, color: 0x990011, isStriped: false }, // كرة 7 عنابى/أحمر داكن سادة
-            { id: 12, color: 0x222288, isStriped: true },  // كرة 12 زرقاء مخططة
-
-            // الصف الثالث
-            { id: 15, color: 0x990011, isStriped: true },  // كرة 15 عنابى مخططة
-            { id: 8, color: 0x111111, isStriped: false }, // كرة 8 سوداء (في المنتصف تماماً)
-            { id: 1, color: 0xffcc00, isStriped: false }, // كرة 1 صفراء سادة
-
-            // الصف الرابع
-            { id: 6, color: 0x008844, isStriped: false }, // كرة 6 خضراء سادة
-            { id: 10, color: 0x1133aa, isStriped: true },  // كرة 10 زرقاء مخططة
-            { id: 3, color: 0xdd2222, isStriped: false }, // كرة 3 حمراء سادة
-            { id: 14, color: 0x008844, isStriped: true },  // كرة 14 خضراء مخططة
-
-            // الصف الخامس (القاعدة الخلفية)
-            { id: 11, color: 0xdd2222, isStriped: true },  // كرة 11 حمراء مخططة
-            { id: 2, color: 0x1133aa, isStriped: false }, // كرة 2 زرقاء سادة
-            { id: 13, color: 0xff6600, isStriped: true },  // كرة 13 برتقالية مخططة
-            { id: 4, color: 0x441166, isStriped: false }, // كرة 4 بنفسجية سادة
-            { id: 5, color: 0xff6600, isStriped: false }  // كرة 5 برتقالية سادة
+            { id: 9, color: 0xffcc00, isStriped: true },  // صفراء مخططة (رأس المثلث)
+            { id: 7, color: 0x990011, isStriped: false }, // عنابي سادة
+            { id: 12, color: 0x222288, isStriped: true },  // زرقاء مخططة
+            { id: 15, color: 0x990011, isStriped: true },  // عنابي مخططة
+            { id: 8, color: 0x111111, isStriped: false }, // سوداء (في المنتصف تماماً)
+            { id: 1, color: 0xffcc00, isStriped: false }, // صفراء سادة
+            { id: 6, color: 0x008844, isStriped: false }, // خضراء سادة
+            { id: 10, color: 0x1133aa, isStriped: true },  // زرقاء مخططة
+            { id: 3, color: 0xdd2222, isStriped: false }, // حمراء سادة
+            { id: 14, color: 0x008844, isStriped: true },  // خضراء مخططة
+            { id: 11, color: 0xdd2222, isStriped: true },  // حمراء مخططة
+            { id: 2, color: 0x1133aa, isStriped: false }, // زرقاء سادة
+            { id: 13, color: 0xff6600, isStriped: true },  // برتقالية مخططة
+            { id: 4, color: 0x441166, isStriped: false }, // بنفسجية سادة
+            { id: 5, color: 0xff6600, isStriped: false }  // برتقالية سادة
         ];
 
-        // 3️⃣ ثالثاً: لوغاريتمية التوزيع الهرمي في الفضاء ثلاثي الأبعاد
-        const apexZ = -this.tableLength / 4; // نقطة رأس المثلث على الطاولة (Foot Spot)
+        const apexZ = -this.tableLength / 4;
         let dataIndex = 0;
 
-        // المسافات البينية مع إضافة هامش ميكروويفي ضئيل جداً (0.0001) لمنع تداخل أسطح الفيزياء عند التحميل
+        // حساب المسافات البينية الهرمية مع إضافة هامش مجهري آمن يمنع التداخل الأولي
         const rowSpacing = this.ballRadius * Math.sqrt(3) + 0.0001;
         const colSpacing = this.ballRadius * 2 + 0.0001;
 
         for (let row = 0; row < 5; row++) {
             for (let col = 0; col <= row; col++) {
                 const ballInfo = rackData[dataIndex++];
-
-                // حساب الإحداثيات المحلية لكل كرة بناءً على صفها وعمودها
                 const x = (col - row * 0.5) * colSpacing;
                 const z = apexZ - (row * rowSpacing);
                 const y = this.ballRadius;
 
-                // أ: تهيئة كائن الفيزياء للكرة وتفعيله للصدم والاصطدام المستمر
+                // تهيئة كائن الفيزياء للكرة وتفعيله للصدم والاصطدام المستمر
                 const ballPhys = new PhysicalBall(ballInfo.id, new THREE.Vector3(x, y, z), this.ballRadius, this.ballMass);
                 this.physicsWorld.addBall(ballPhys);
 
-                // ب: هندسة الشكل البصري (المظهر المطور التفصيلي للكرات السادة والمخططة)
+                // بناء الهيكل البصري للكرات السادة والمخططة
                 let ballMesh;
-
                 if (ballInfo.isStriped) {
-                    // الكرات المخططة (Striped): نصنع مجموعة مدمجة تجمع بين الجسد الأبيض والخط الملون المنتصف
                     ballMesh = new THREE.Group();
-
-                    // قاعدة الجسم بيضاء كريمية للكرة المخططة
                     const baseMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.1 }));
                     baseMesh.castShadow = true;
                     ballMesh.add(baseMesh);
 
-                    // الخط الدائري الملتف (The Stripe)
+                    // الأسطوانة الدائرية الملتفة (The Stripe)
                     const stripeGeo = new THREE.CylinderGeometry(this.ballRadius + 0.0002, this.ballRadius + 0.0002, this.ballRadius * 0.8, 32, 1, true);
                     const stripeMat = new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1, side: THREE.DoubleSide });
                     const stripeMesh = new THREE.Mesh(stripeGeo, stripeMat);
-
-                    // تدوير الأسطوانة لتلتف أفقياً حول محور الكرة
                     stripeMesh.rotation.x = Math.PI / 2;
                     ballMesh.add(stripeMesh);
                 } else {
-                    // الكرات السادة (Solid): مادة لونية موحدة كاملة
                     ballMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1 }));
                     ballMesh.castShadow = true;
                 }
 
-                // ج: إضافة الكرة إلى المشهد الرسومي وحفظها في مصفوفة المتابعة والتحديث
                 this.tableGraphics.scene.add(ballMesh);
                 this.ballMeshes.push({ physics: ballPhys, mesh: ballMesh });
             }
         }
+    }
+
+    initPhysicsGUI() {
+        // 1. إنشاء لوحة GUI رئيسية وتحديد عنوانها وموقعها
+        const gui = new GUI({ title: '⚙️ متحكم المعاملات الفيزيائية' });
+        gui.domElement.style.top = '10px';
+        gui.domElement.style.right = '10px';
+
+        const config = this.physicsWorld.config;
+
+        // 2. مجلد التحكم في احتكاك السطح ومقاومة الهواء (القماش والبيئة)
+        const clothFolder = gui.addFolder('🪢 الطاولة والقماش');
+        clothFolder.add(config, 'mu_sliding', 0.05, 0.50, 0.01)
+            .name('احتكاك الانزلاق (μk)')
+            .onChange(value => this.physicsWorld.updateParameters({ mu_sliding: value }));
+
+        clothFolder.add(config, 'mu_rolling', 0.005, 0.08, 0.001)
+            .name('مقاومة التدحرج (μr)')
+            .onChange(value => this.physicsWorld.updateParameters({ mu_rolling: value }));
+
+        clothFolder.add(config, 'k_air', 0.0, 0.05, 0.001)
+            .name('مقاومة الهواء')
+            .onChange(value => this.physicsWorld.updateParameters({ k_air: value }));
+
+        // 3. مجلد التحكم في معاملات الارتداد (الصدم الديناميكي)
+        const bounceFolder = gui.addFolder('💥 الارتداد والتصادم');
+        bounceFolder.add(config, 'e_ball', 0.80, 1.0, 0.01)
+            .name('ارتداد الكرات (e)')
+            .onChange(value => this.physicsWorld.updateParameters({ e_ball: value }));
+
+        bounceFolder.add(config, 'e_cushion', 0.50, 0.95, 0.01)
+            .name('ارتداد حواف المطاط (ec)')
+            .onChange(value => this.physicsWorld.updateParameters({ e_cushion: value }));
+
+        bounceFolder.add(config, 'cushion_friction', 0.0, 0.6, 0.01)
+            .name('احتكاك المطاط مماسياً')
+            .onChange(value => this.physicsWorld.updateParameters({ cushion_friction: value }));
+
+        // 4. مجلد التحكم في قوة واتجاه ضربة العصا والـ Spin
+        const strikeFolder = gui.addFolder('🥍 إعدادات ضربة العصا');
+        strikeFolder.add(config, 'strikeImpulse', 0.1, 4.0, 0.05)
+            .name('قوة الدفع (J)')
+            .onChange(value => this.physicsWorld.updateParameters({ strikeImpulse: value }));
+
+        strikeFolder.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001)
+            .name('انحراف الدوران (Spin X)')
+            .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetX: value }));
+
+        strikeFolder.add(config, 'strikeOffsetY', -0.02, 0.02, 0.001)
+            .name('انحراف الدوران (Spin Y)')
+            .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetY: value }));
+
+        // 5. ربط قوى القوانين الخارجية المتواجدة بالمشروع (الرياح والحقل المغناطيسي) مع الـ GUI الخاص بها
+        if (this.physicsWorld.registeredForces) {
+            this.physicsWorld.registeredForces.forEach(force => {
+                const forceFolder = gui.addFolder(`🌀 قانون: ${force.name}`);
+                force.setupGUI(forceFolder);
+            });
+        }
+
+        // فتح القوائم افتراضياً لسهولة التعديل
+        clothFolder.open();
+        bounceFolder.open();
     }
 
     initControlsInteraction() {
@@ -157,16 +212,15 @@ export class SimulationApp {
     }
 
     triggerAdvancedStrike() {
-        // 1. جلب الكرة البيضاء بشكل صحيح من مصفوفة الكرات (الكرة رقم 0)
         const cueBall = this.ballMeshes[0].physics;
 
-        // 2. شروط الحماية باستخدام أسماء المتغيرات الصحيحة لديك (this.cueManager)
+        // إصلاح الأخطاء البرمجية للـ Scope والتحقق من سلامة كائنات العصا والفيزياء الحالية
         if (!cueBall || !cueBall.isSleeping || cueBall.isPocketted || this.cueManager.isStrikingAnimation) return;
 
-        // 3. تصفير العداد وتفعيل أنيميشن حركة العصا البصرية
+        // تفعيل بدء أنيميشن العصا البصري بطريقة سليمة لا تتعارض مع الدوران
         this.cueManager.strikeProgress = 0;
         this.cueManager.isStrikingAnimation = true;
-        this.cueManager.cueMesh.visible = true; // التأكد من ظهور العصا لبدء الحركة
+        this.cueManager.cueMesh.visible = true;
     }
 
     initTelemetryDOM() {
@@ -213,6 +267,7 @@ export class SimulationApp {
             force.setupGUI(folder);
             folder.close();
         });
+
     }
 
     animate(timestamp) {
