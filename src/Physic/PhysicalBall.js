@@ -69,7 +69,7 @@ export class PhysicalBall {
     const vcMag = v_relative.length();
 
     // عتبة متناهية الدقة للفصل بين الانزلاق الحركي النشط والتدحرج النقي (1e-3 م/ث)
-    if (vcMag > 0.005) {
+    if (vcMag > 0.0185) {
         // [طور الانزلاق النشط]: الاحتكاك يقلل السرعة الخطية ويزيد/يعدل السرعة الزاوية معاً
         const slidingMag = Physics.slidingFrictionMagnitude(config.mu_sliding, this.mass, g);
         const frictionForce = v_relative.clone().normalize().negate().multiplyScalar(slidingMag);
