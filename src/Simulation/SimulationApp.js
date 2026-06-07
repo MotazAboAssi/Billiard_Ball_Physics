@@ -50,21 +50,21 @@ export class SimulationApp {
 
         // 2. مصفوفة البيانات الدقيقة للـ 15 كرة (الأرقام، الألوان، ونوع التصميم السادة/المخطط)
         const rackData = [
-            { id: 9, color: 0xffcc00, isStriped: true },  
-            { id: 7, color: 0x990011, isStriped: false }, 
-            { id: 12, color: 0x222288, isStriped: true },  
-            { id: 15, color: 0x990011, isStriped: true },  
-            { id: 8, color: 0x111111, isStriped: false }, 
-            { id: 1, color: 0xffcc00, isStriped: false }, 
-            { id: 6, color: 0x008844, isStriped: false }, 
-            { id: 10, color: 0x1133aa, isStriped: true },  
-            { id: 3, color: 0xdd2222, isStriped: false }, 
-            { id: 14, color: 0x008844, isStriped: true },  
-            { id: 11, color: 0xdd2222, isStriped: true },  
-            { id: 2, color: 0x1133aa, isStriped: false }, 
-            { id: 13, color: 0xff6600, isStriped: true },  
-            { id: 4, color: 0x441166, isStriped: false }, 
-            { id: 5, color: 0xff6600, isStriped: false }  
+            { id: 9, color: 0xffcc00, isStriped: true },
+            { id: 7, color: 0x990011, isStriped: false },
+            { id: 12, color: 0x222288, isStriped: true },
+            { id: 15, color: 0x990011, isStriped: true },
+            { id: 8, color: 0x111111, isStriped: false },
+            { id: 1, color: 0xffcc00, isStriped: false },
+            { id: 6, color: 0x008844, isStriped: false },
+            { id: 10, color: 0x1133aa, isStriped: true },
+            { id: 3, color: 0xdd2222, isStriped: false },
+            { id: 14, color: 0x008844, isStriped: true },
+            { id: 11, color: 0xdd2222, isStriped: true },
+            { id: 2, color: 0x1133aa, isStriped: false },
+            { id: 13, color: 0xff6600, isStriped: true },
+            { id: 4, color: 0x441166, isStriped: false },
+            { id: 5, color: 0xff6600, isStriped: false }
         ];
 
         const apexZ = -this.tableLength / 4;
@@ -73,37 +73,87 @@ export class SimulationApp {
         const rowSpacing = this.ballRadius * Math.sqrt(3) + 0.0001;
         const colSpacing = this.ballRadius * 2 + 0.0001;
 
+        // داخل دالة initPhysicsWorld() في ملف SimulationApp.js
         for (let row = 0; row < 5; row++) {
             for (let col = 0; col <= row; col++) {
-                const ballInfo = rackData[dataIndex++];
-                const x = (col - row * 0.5) * colSpacing;
-                const z = apexZ - (row * rowSpacing);
-                const y = this.ballRadius;
+                const ballInfo = rackData[dataIndex++]; //
+                const x = (col - row * 0.5) * colSpacing; //
+                const z = apexZ - (row * rowSpacing); //[cite: 9]
+                const y = this.ballRadius; //[cite: 9]
 
-                const ballPhys = new PhysicalBall(ballInfo.id, new THREE.Vector3(x, y, z), this.ballRadius, this.ballMass);
-                this.physicsWorld.addBall(ballPhys);
+                const ballPhys = new PhysicalBall(ballInfo.id, new THREE.Vector3(x, y, z), this.ballRadius, this.ballMass); //[cite: 9]
+                this.physicsWorld.addBall(ballPhys); //[cite: 9]
 
-                let ballMesh;
-                if (ballInfo.isStriped) {
-                    ballMesh = new THREE.Group();
-                    const baseMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.1 }));
-                    baseMesh.castShadow = true;
-                    ballMesh.add(baseMesh);
+                let ballMesh; //[cite: 9]
+                if (ballInfo.isStriped) { //[cite: 9]
+                    ballMesh = new THREE.Group(); //[cite: 9]
+                    const baseMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.1 })); //[cite: 9]
+                    baseMesh.castShadow = true; //[cite: 9]
+                    ballMesh.add(baseMesh); //[cite: 9]
 
-                    const stripeGeo = new THREE.CylinderGeometry(this.ballRadius + 0.0002, this.ballRadius + 0.0002, this.ballRadius * 0.8, 32, 1, true);
-                    const stripeMat = new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1, side: THREE.DoubleSide });
-                    const stripeMesh = new THREE.Mesh(stripeGeo, stripeMat);
-                    stripeMesh.rotation.x = Math.PI / 2;
-                    ballMesh.add(stripeMesh);
+                    const stripeGeo = new THREE.CylinderGeometry(this.ballRadius + 0.0002, this.ballRadius + 0.0002, this.ballRadius * 0.8, 32, 1, true); //[cite: 9]
+                    const stripeMat = new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1, side: THREE.DoubleSide }); //[cite: 9]
+                    const stripeMesh = new THREE.Mesh(stripeGeo, stripeMat); //[cite: 9]
+                    stripeMesh.rotation.x = Math.PI / 2; //[cite: 9]
+                    ballMesh.add(stripeMesh); //[cite: 9]
                 } else {
-                    ballMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1 }));
-                    ballMesh.castShadow = true;
+                    ballMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1 })); //[cite: 9]
+                    ballMesh.castShadow = true; //[cite: 9]
                 }
 
-                this.tableGraphics.scene.add(ballMesh);
-                this.ballMeshes.push({ physics: ballPhys, mesh: ballMesh });
+                // 🔥 الحاقن الجديد: إضافة الرقم العائم فوق الكرة مباشرة
+                const numberSprite = this.createFloatingNumberSprite(ballInfo.id);
+                // نرفع الرقم قليلاً فوق القطب العلوي للكرة ليصبح عائماً بشكل واضخ
+                numberSprite.position.set(0, this.ballRadius * 1.6, 0);
+                ballMesh.add(numberSprite);
+
+                this.tableGraphics.scene.add(ballMesh); //[cite: 9]
+                // this.ballMeshes.push({ physics: ballPhys, mesh: ballMesh, sprite: numberSprite }); //[cite: 9]
+                this.ballMeshes.push({ physics: ballPhys, mesh: ballMesh, sprite: numberSprite }); //[cite: 9]
             }
         }
+    }
+
+    /**
+     * توليد لوحة نصية عائمة (Sprite) برقم الكرة تلتفت دائماً صوب الكاميرا (Billboard)
+     */
+    createFloatingNumberSprite(number) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+
+        // 1. رسم خلفية دائرية صغيرة كـ Badge خلف الرقم (اختياري لجعلها مقروءة جداً)
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.25)'; // لون داكن متناسق مع اللوحة الجانبية
+        ctx.beginPath();
+        ctx.arc(64, 64, 50, 0, Math.PI * 2);
+        ctx.fill();
+
+        // إطار مضيء حول دائرة الرقم
+        ctx.strokeStyle = 'transparent';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+
+        // 2. كتابة رقم الكرة في المنتصف
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 55px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(number, 64, 64);
+
+        // 3. تحويل الـ Canvas إلى Texture خاص بـ Three.js
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({
+            map: texture,
+            transparent: true,
+            depthTest: true // لجعل الرقم يختفي إذا دخلت الكرة داخل الحفرة
+        });
+
+        const sprite = new THREE.Sprite(spriteMaterial);
+        // ضبط الحجم المناسب للرقم العائم بالنسبة لحجم الكرة الصغير
+        sprite.scale.set(0.12, 0.12, 1);
+
+        return sprite;
     }
 
     initTelemetryDOM() {
@@ -117,7 +167,7 @@ export class SimulationApp {
             padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
             border: 1px solid #334155; z-index: 1000; pointer-events: auto; direction: ltr;
         `;
-        
+
         panel.innerHTML = `
             <h3 style="margin-top: 0; border-bottom: 2px solid #00ffaa; padding-bottom: 5px; color: #00ffaa; font-family: sans-serif; font-size: 14px;">📊 اللوحة اللحظية للمختبر الفيزيائي</h3>
             <div style="margin-bottom: 10px;">
@@ -164,7 +214,7 @@ export class SimulationApp {
         const config = this.physicsWorld.config;
 
         const fStrike = this.gui.addFolder('🏑 التحكم بالعصا والضربة');
-        fStrike.add(config, 'strikeImpulse', 0.1, 5.0, 0.05).name('دفع الضربة (Impulse)')
+        fStrike.add(config, 'strikeImpulse', 0.1, 3.0, 0.05).name('دفع الضربة (Impulse)')
             .onChange(value => this.physicsWorld.updateParameters({ strikeImpulse: value }));
         fStrike.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001).name('انحراف أفقي (X Offset)')
             .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetX: value }));
@@ -207,56 +257,56 @@ export class SimulationApp {
         window.addEventListener('resize', this.onWindowResize);
     }
     initKeyboardSwitching() {
-    window.addEventListener('keydown', (event) => {
-        // التحقق من أن المستخدم لا يكتب داخل صندوق إدخال نصي (مثل الـ GUI إن وجد) لمنع التداخل
-        if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') return;
+        window.addEventListener('keydown', (event) => {
+            // التحقق من أن المستخدم لا يكتب داخل صندوق إدخال نصي (مثل الـ GUI إن وجد) لمنع التداخل
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') return;
 
-        let targetId = null;
+            let targetId = null;
 
-        // فحص إذا كان الزر المكبوس هو أحد الأرقام من 1 إلى 9
-        // event.key يعطي القيمة النصية للمفتاح (مثلاً '1', '2'...)
-        if (event.key >= '1' && event.key <= '9') {
-            const num = parseInt(event.key);
+            // فحص إذا كان الزر المكبوس هو أحد الأرقام من 1 إلى 9
+            // event.key يعطي القيمة النصية للمفتاح (مثلاً '1', '2'...)
+            if (event.key >= '1' && event.key <= '9') {
+                const num = parseInt(event.key);
 
-            if (event.metaKey) {
-                // 1. حالة الـ Shift: الأرقام من 1 إلى 7 تتحول إلى (9 إلى 15)
-                if (num >= 1 && num <= 7) {
-                    targetId = num + 8; // مثلاً Shift + 1 يعطي 9
-                }
-            } else {
-                // 2. الحالة العادية: الأرقام من 1 إلى 8 تعطي الكرات من 1 إلى 8 مباشرة
-                if (num >= 1 && num <= 8) {
-                    targetId = num;
-                }
-            }
-        } 
-        // 3. تخصيص زر الـ "0" أو زر المسافة "Space" للعودة إلى الكرة البيضاء (ID = 0)
-        else if (event.key === '0' || event.key === ' ') {
-            targetId = 0;
-            if (event.key === ' ') event.preventDefault(); // منع المتصفح من النزول لأسفل الصفحة عند ضغط Space
-        }
-
-        // إذا تم العثور على هدف متوافق، نقوم بتحديث القائمة المنسدلة وتنبيه واجهة المستخدم
-        if (targetId !== null) {
-            // التأكد من أن الكرة المطلوبة موجودة وغير ساقطة في الحفرة (اختياري حسب رغبتك)
-            const ballExists = this.ballMeshes.some(item => item.physics.id === targetId);
-            
-            if (ballExists && this.ballSelect) {
-                this.ballSelect.value = targetId;
-                
-                // إطلاق حدث 'change' برمجياً لضمان تحديث اللوحة فوراً دون انتظار الإطار التالي
-                this.ballSelect.dispatchEvent(new Event('change'));
-                
-                // تأثير بصري بسيط: جعل اللوحة تومض بالأخضر لثانية لمعرفة أن التغيير نجح عبر الكيبورد
-                const panel = document.getElementById('physics-telemetry-panel');
-                if (panel) {
-                    panel.style.borderColor = '#00ffaa';
-                    setTimeout(() => { panel.style.borderColor = '#334155'; }, 200);
+                if (event.metaKey) {
+                    // 1. حالة الـ Shift: الأرقام من 1 إلى 7 تتحول إلى (9 إلى 15)
+                    if (num >= 1 && num <= 7) {
+                        targetId = num + 8; // مثلاً Shift + 1 يعطي 9
+                    }
+                } else {
+                    // 2. الحالة العادية: الأرقام من 1 إلى 8 تعطي الكرات من 1 إلى 8 مباشرة
+                    if (num >= 1 && num <= 8) {
+                        targetId = num;
+                    }
                 }
             }
-        }
-    });
-}
+            // 3. تخصيص زر الـ "0" أو زر المسافة "Space" للعودة إلى الكرة البيضاء (ID = 0)
+            else if (event.key === '0' || event.key === ' ') {
+                targetId = 0;
+                if (event.key === ' ') event.preventDefault(); // منع المتصفح من النزول لأسفل الصفحة عند ضغط Space
+            }
+
+            // إذا تم العثور على هدف متوافق، نقوم بتحديث القائمة المنسدلة وتنبيه واجهة المستخدم
+            if (targetId !== null) {
+                // التأكد من أن الكرة المطلوبة موجودة وغير ساقطة في الحفرة (اختياري حسب رغبتك)
+                const ballExists = this.ballMeshes.some(item => item.physics.id === targetId);
+
+                if (ballExists && this.ballSelect) {
+                    this.ballSelect.value = targetId;
+
+                    // إطلاق حدث 'change' برمجياً لضمان تحديث اللوحة فوراً دون انتظار الإطار التالي
+                    this.ballSelect.dispatchEvent(new Event('change'));
+
+                    // تأثير بصري بسيط: جعل اللوحة تومض بالأخضر لثانية لمعرفة أن التغيير نجح عبر الكيبورد
+                    const panel = document.getElementById('physics-telemetry-panel');
+                    if (panel) {
+                        panel.style.borderColor = '#00ffaa';
+                        setTimeout(() => { panel.style.borderColor = '#334155'; }, 200);
+                    }
+                }
+            }
+        });
+    }
 
     onPointerDown(e) {
         const cueBall = this.ballMeshes[0].physics;
@@ -302,18 +352,26 @@ export class SimulationApp {
         }
 
         for (let item of this.ballMeshes) {
-            item.mesh.position.copy(item.physics.position);
-            item.mesh.visible = !item.physics.isPocketted;
+            item.mesh.position.copy(item.physics.position); //[cite: 9]
+            item.mesh.visible = !item.physics.isPocketted; //[cite: 9]
 
-            if (!item.physics.isSleeping && !item.physics.isPocketted) {
-                const deltaRotation = item.physics.angularVelocity.clone().multiplyScalar(this.fixedTimeStep);
-                const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(deltaRotation.x, deltaRotation.y, deltaRotation.z, 'XYZ'));
-                item.mesh.quaternion.multiplyQuaternions(quaternion, item.mesh.quaternion);
+            if (!item.physics.isSleeping && !item.physics.isPocketted) { //[cite: 9]
+                const deltaRotation = item.physics.angularVelocity.clone().multiplyScalar(this.fixedTimeStep); //[cite: 9]
+                const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(deltaRotation.x, deltaRotation.y, deltaRotation.z, 'XYZ')); //[cite: 9]
+                item.mesh.quaternion.multiplyQuaternions(quaternion, item.mesh.quaternion); //[cite: 9]
+            }
+
+            // 🔥 الحاقن الجديد: إلغاء تأثير دوران الكرة على الرقم العائم ليبقى ثابتاً للأعلى ومقروءاً
+            if (item.sprite) {
+                // نأخذ معكوس دوران الكرة ونطبقه على الـ Sprite ليظل رأسه دائماً متجهاً لأعلى الطاولة
+                item.sprite.quaternion.copy(item.mesh.quaternion).invert();
             }
         }
 
         // 🔥 استدعاء دالة تحديث الحسابات الفيزيائية اللحظية وحقنها في لوحة الرصد الجانبية
         this.updateTelemetryUI();
+
+
 
         this.tableGraphics.controls.update();
         this.tableGraphics.renderer.render(this.tableGraphics.scene, this.tableGraphics.camera);
