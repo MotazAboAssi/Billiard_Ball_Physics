@@ -214,7 +214,7 @@ export class SimulationApp {
         const config = this.physicsWorld.config;
 
         const fStrike = this.gui.addFolder('🏑 التحكم بالعصا والضربة');
-        fStrike.add(config, 'strikeImpulse', 0.1, 5.0, 0.05).name('دفع الضربة (Impulse)')
+        fStrike.add(config, 'strikeImpulse', 0.1, 3.0, 0.05).name('دفع الضربة (Impulse)')
             .onChange(value => this.physicsWorld.updateParameters({ strikeImpulse: value }));
         fStrike.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001).name('انحراف أفقي (X Offset)')
             .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetX: value }));
