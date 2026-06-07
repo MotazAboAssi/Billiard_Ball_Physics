@@ -92,24 +92,11 @@ export function isPureRolling(linearVelocity, angularVelocity, radiusVec, thresh
  * المرجع: معادلة القيد v = ω × r (مع مراعاة المحاور)
  */
 export function enforceRollingConstraint(linearVelocity, radius, previousAngularVelocity) {
-    // نأخذ السرعة في المستوى الأفقي (x, z)
-    const vx = linearVelocity.x;
-    const vz = linearVelocity.z;
-    // العلاقة: للكرة تتدحرج على سطح أفقي، نقطة التلامس سفلى r_vec = (0, -R, 0)
-    // ω × r = (ω_y * R, 0, -ω_x * R) يجب أن تساوي (-vx, ?, -vz) للإشارة؟
-    // التفصيل: v_point = v + ω × r = 0 => ω × r = -v
-    // ω × (0, -R, 0) = (ω_y * R, 0, -ω_x * R)
-    // إذن يجب أن يكون (ω_y * R, 0, -ω_x * R) = (-vx, 0, -vz)
-    // أي ω_y = -vx / R, ω_x = vz / R
-    // لكن لاحظ أن الإشارات تحتاج تناسق مع اتجاه المحاور. الكود الأصلي استخدم:
-    // angularVelocity.set(v.z/R, 0, -v.x/R)
-    // دعنا نتحقق: إذا كانت v.x موجبة نحو اليمين، v.z موجبة للأعلى، فإن التدحرج الأمامي يتطلب ω_x سالبة (للدوران حول x). 
-    // الكود الأصلي: angularVelocity.z = -v.x/R (صحيح), angularVelocity.x = v.z/R (صحيح). 
-    // نبقي على ω_y دون تغيير.
     const newAngularVelocity = previousAngularVelocity.clone();
+    // العلاقات المتوافقة مع الإحداثيات الكارتيزية لمحرك Three.js (التدحرج الأفقي)
     newAngularVelocity.x = linearVelocity.z / radius;
     newAngularVelocity.z = -linearVelocity.x / radius;
-    // لا نغير y (spin)
+    // الحفاظ التام على الدوران المغزلي العمودي (Spin Y) دون تصفير قسري
     return newAngularVelocity;
 }
 

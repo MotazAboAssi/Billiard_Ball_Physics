@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import GUI from 'lil-gui';
-import { PhysicsWorld, PhysicalBall } from '../Physic/';
+import { PhysicsWorld, PhysicalBall } from './../Physic'; // 🔥 تم إصلاح مسار الاستيراد المكسور هنا
 import { WindBlowForce, MagneticCueBallForce } from './../IExternalForce.js';
 import { TableGraphics } from './TableGraphics.js';
 import { CueStickManager } from './CueStickManager.js';
@@ -22,19 +22,19 @@ export class SimulationApp {
         this.physicsWorld.registerExternalForce(new WindBlowForce());
         this.physicsWorld.registerExternalForce(new MagneticCueBallForce());
 
-        // تهيئة الوحدات المنفصلة الجديدة
+        // تهيئة الوحدات المنفصلة الرسومية والعصا
         this.tableGraphics = new TableGraphics(this);
         this.cueManager = new CueStickManager(this, this.tableGraphics.scene);
 
         this.initPhysicsWorld();
-        this.initTelemetryDOM();
+        this.initTelemetryDOM();       // بناء لوحة القياسات الفيزيائية الجانبية المتطورة بالكامل HTML/DOM
+        this.initTelemetryBallSelect(); // شحن مصفوفة الـ ID داخل القائمة المنسدلة للرصد اللحظي
+        this.initKeyboardSwitching(); // 🔥 أضف هذا السطر هنا لتفعيل الاستماع للوحة المفاتيح
         this.initGUI();
         this.initControlsInteraction();
 
         this.lastTime = performance.now();
-        window.requestAnimationFrame(this.animate);
-
-        window.requestAnimationFrame(this.animate);
+        window.requestAnimationFrame(this.animate); // تم التخلص من الاستدعاء المزدوج لثبات الأداء
     }
 
     initPhysicsWorld() {
@@ -48,29 +48,28 @@ export class SimulationApp {
         this.physicsWorld.addBall(cueBallPhys);
         this.ballMeshes.push({ physics: cueBallPhys, mesh: cueBallMesh });
 
-        // 2. مصفوفة البيانات الدقيقة للـ 15 كرة (الأرقام، الألوان، ونوع التصميم السادة/المخطط) متوافقة مع الصورة
+        // 2. مصفوفة البيانات الدقيقة للـ 15 كرة (الأرقام، الألوان، ونوع التصميم السادة/المخطط)
         const rackData = [
-            { id: 9, color: 0xffcc00, isStriped: true },  // صفراء مخططة (رأس المثلث)
-            { id: 7, color: 0x990011, isStriped: false }, // عنابي سادة
-            { id: 12, color: 0x222288, isStriped: true },  // زرقاء مخططة
-            { id: 15, color: 0x990011, isStriped: true },  // عنابي مخططة
-            { id: 8, color: 0x111111, isStriped: false }, // سوداء (في المنتصف تماماً)
-            { id: 1, color: 0xffcc00, isStriped: false }, // صفراء سادة
-            { id: 6, color: 0x008844, isStriped: false }, // خضراء سادة
-            { id: 10, color: 0x1133aa, isStriped: true },  // زرقاء مخططة
-            { id: 3, color: 0xdd2222, isStriped: false }, // حمراء سادة
-            { id: 14, color: 0x008844, isStriped: true },  // خضراء مخططة
-            { id: 11, color: 0xdd2222, isStriped: true },  // حمراء مخططة
-            { id: 2, color: 0x1133aa, isStriped: false }, // زرقاء سادة
-            { id: 13, color: 0xff6600, isStriped: true },  // برتقالية مخططة
-            { id: 4, color: 0x441166, isStriped: false }, // بنفسجية سادة
-            { id: 5, color: 0xff6600, isStriped: false }  // برتقالية سادة
+            { id: 9, color: 0xffcc00, isStriped: true },  
+            { id: 7, color: 0x990011, isStriped: false }, 
+            { id: 12, color: 0x222288, isStriped: true },  
+            { id: 15, color: 0x990011, isStriped: true },  
+            { id: 8, color: 0x111111, isStriped: false }, 
+            { id: 1, color: 0xffcc00, isStriped: false }, 
+            { id: 6, color: 0x008844, isStriped: false }, 
+            { id: 10, color: 0x1133aa, isStriped: true },  
+            { id: 3, color: 0xdd2222, isStriped: false }, 
+            { id: 14, color: 0x008844, isStriped: true },  
+            { id: 11, color: 0xdd2222, isStriped: true },  
+            { id: 2, color: 0x1133aa, isStriped: false }, 
+            { id: 13, color: 0xff6600, isStriped: true },  
+            { id: 4, color: 0x441166, isStriped: false }, 
+            { id: 5, color: 0xff6600, isStriped: false }  
         ];
 
         const apexZ = -this.tableLength / 4;
         let dataIndex = 0;
 
-        // حساب المسافات البينية الهرمية مع إضافة هامش مجهري آمن يمنع التداخل الأولي
         const rowSpacing = this.ballRadius * Math.sqrt(3) + 0.0001;
         const colSpacing = this.ballRadius * 2 + 0.0001;
 
@@ -81,11 +80,9 @@ export class SimulationApp {
                 const z = apexZ - (row * rowSpacing);
                 const y = this.ballRadius;
 
-                // تهيئة كائن الفيزياء للكرة وتفعيله للصدم والاصطدام المستمر
                 const ballPhys = new PhysicalBall(ballInfo.id, new THREE.Vector3(x, y, z), this.ballRadius, this.ballMass);
                 this.physicsWorld.addBall(ballPhys);
 
-                // بناء الهيكل البصري للكرات السادة والمخططة
                 let ballMesh;
                 if (ballInfo.isStriped) {
                     ballMesh = new THREE.Group();
@@ -93,7 +90,6 @@ export class SimulationApp {
                     baseMesh.castShadow = true;
                     ballMesh.add(baseMesh);
 
-                    // الأسطوانة الدائرية الملتفة (The Stripe)
                     const stripeGeo = new THREE.CylinderGeometry(this.ballRadius + 0.0002, this.ballRadius + 0.0002, this.ballRadius * 0.8, 32, 1, true);
                     const stripeMat = new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1, side: THREE.DoubleSide });
                     const stripeMesh = new THREE.Mesh(stripeGeo, stripeMat);
@@ -110,67 +106,98 @@ export class SimulationApp {
         }
     }
 
-    initPhysicsGUI() {
-        // 1. إنشاء لوحة GUI رئيسية وتحديد عنوانها وموقعها
-        const gui = new GUI({ title: '⚙️ متحكم المعاملات الفيزيائية' });
-        gui.domElement.style.top = '10px';
-        gui.domElement.style.right = '10px';
+    initTelemetryDOM() {
+        // بناء اللوحة الجانبية الرادارية الفيزيائية المتطورة برمجياً لحقنها في الواجهة
+        const panel = document.createElement('div');
+        panel.id = 'physics-telemetry-panel';
+        panel.style.cssText = `
+            position: absolute; top: 10px; left: 10px; width: 300px;
+            background: rgba(15, 23, 42, 0.95); color: #e2e8f0;
+            font-family: 'Courier New', monospace; font-size: 12px;
+            padding: 15px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            border: 1px solid #334155; z-index: 1000; pointer-events: auto; direction: ltr;
+        `;
+        
+        panel.innerHTML = `
+            <h3 style="margin-top: 0; border-bottom: 2px solid #00ffaa; padding-bottom: 5px; color: #00ffaa; font-family: sans-serif; font-size: 14px;">📊 اللوحة اللحظية للمختبر الفيزيائي</h3>
+            <div style="margin-bottom: 10px;">
+                <label for="telemetry-ball-select" style="font-family: sans-serif; color: #94a3b8;">اختر الكرة للمراقبة اللحظية:</label>
+                <select id="telemetry-ball-select" style="background: #1e293b; color: #fff; border: 1px solid #475569; padding: 4px; width: 100%; margin-top: 5px; border-radius: 4px; font-family: sans-serif;"></select>
+            </div>
+            <div style="border-bottom: 1px solid #334155; padding: 4px 0; display: flex; justify-content: space-between;"><span>System Total KE:</span> <span id="tel-sys-ke" style="color: #10b981; font-weight: bold;">0.00000 J</span></div>
+            <div style="border-bottom: 1px solid #334155; padding: 4px 0; display: flex; justify-content: space-between;"><span>Ball State:</span> <span id="tel-state" style="font-weight: bold;">-</span></div>
+            <div style="border-bottom: 1px solid #334155; padding: 4px 0; display: flex; justify-content: space-between;"><span>Ball Indiv KE:</span> <span id="tel-ball-ke">0.00000 J</span></div>
+            <div style="border-bottom: 1px solid #334155; padding: 4px 0; display: flex; justify-content: space-between;"><span>Linear Vel |v|:</span> <span id="tel-velocity">0.0000 m/s</span></div>
+            <div style="border-bottom: 1px solid #334155; padding: 4px 0; display: flex; justify-content: space-between;"><span>Angular Vel |w|:</span> <span id="tel-angular">0.0000 rad/s</span></div>
+            <div style="border-bottom: 1px solid #334155; padding: 4px 0; display: flex; justify-content: space-between;"><span>Contact Vel |vc|:</span> <span id="tel-vc">0.0000 m/s</span></div>
+            <div style="padding: 4px 0; display: flex; justify-content: space-between;"><span>Kinetic Phase:</span> <span id="tel-phase" style="font-weight: bold;">-</span></div>
+            <div style="color: #ffaa00; font-size:10px; margin-top:8px; font-family: sans-serif; border-top: 1px dashed #475569; padding-top: 5px;">💡 اسحب بالماوس مع زر الأيمن (أو Shift) للتصويب</div>
+        `;
+        document.body.appendChild(panel);
 
+        // ربط معرفات الـ DOM الداخلية لتلقي البيانات المتغيرة بشكل لحظي أثناء الـ Animation Loop
+        this.domETotal = document.getElementById('tel-sys-ke');
+        this.domCueState = document.getElementById('tel-state');
+        this.domBallKE = document.getElementById('tel-ball-ke');
+        this.domVelocity = document.getElementById('tel-velocity');
+        this.domAngular = document.getElementById('tel-angular');
+        this.domVc = document.getElementById('tel-vc');
+        this.domPhase = document.getElementById('tel-phase');
+        this.ballSelect = document.getElementById('telemetry-ball-select');
+    }
+
+    initTelemetryBallSelect() {
+        if (!this.ballSelect) return;
+        this.ballSelect.innerHTML = '';
+        this.ballMeshes.forEach(item => {
+            const opt = document.createElement('option');
+            opt.value = item.physics.id;
+            opt.innerText = item.physics.id === 0 ? "الكرة البيضاء (Cue Ball)" : `كرة الهدف الرقمية [${item.physics.id}]`;
+            this.ballSelect.appendChild(opt);
+        });
+    }
+
+    initGUI() {
+        this.gui = new GUI({ title: '🕹️ لوحة هندسة القوانين الفيزيائية' });
+        this.gui.domElement.style.top = '10px';
+        this.gui.domElement.style.right = '10px';
         const config = this.physicsWorld.config;
 
-        // 2. مجلد التحكم في احتكاك السطح ومقاومة الهواء (القماش والبيئة)
-        const clothFolder = gui.addFolder('🪢 الطاولة والقماش');
-        clothFolder.add(config, 'mu_sliding', 0.05, 0.50, 0.01)
-            .name('احتكاك الانزلاق (μk)')
+        const fStrike = this.gui.addFolder('🏑 التحكم بالعصا والضربة');
+        fStrike.add(config, 'strikeImpulse', 0.1, 5.0, 0.05).name('دفع الضربة (Impulse)')
+            .onChange(value => this.physicsWorld.updateParameters({ strikeImpulse: value }));
+        fStrike.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001).name('انحراف أفقي (X Offset)')
+            .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetX: value }));
+        fStrike.add(config, 'strikeOffsetY', -0.02, 0.02, 0.001).name('انحراف رأسي (Y Offset)')
+            .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetY: value }));
+        fStrike.add(this, 'triggerAdvancedStrike').name('🚀 إطلاق القوة');
+        fStrike.open();
+
+        const fEnvironment = this.gui.addFolder('🌍 البيئة والاحتكاك السطحي');
+        fEnvironment.add(config, 'gravity', 0.0, 25.0, 0.1).name('الجاذبية (g)')
+            .onChange(value => this.physicsWorld.updateParameters({ gravity: value }));
+        fEnvironment.add(config, 'mu_sliding', 0.0, 0.8, 0.01).name('احتكاك الانزلاق (Sliding)')
             .onChange(value => this.physicsWorld.updateParameters({ mu_sliding: value }));
-
-        clothFolder.add(config, 'mu_rolling', 0.005, 0.08, 0.001)
-            .name('مقاومة التدحرج (μr)')
+        fEnvironment.add(config, 'mu_rolling', 0.0, 0.1, 0.001).name('احتكاك التدحرج (Rolling)')
             .onChange(value => this.physicsWorld.updateParameters({ mu_rolling: value }));
-
-        clothFolder.add(config, 'k_air', 0.0, 0.05, 0.001)
-            .name('مقاومة الهواء')
+        fEnvironment.add(config, 'k_air', 0.0, 0.05, 0.001).name('مقاومة الهواء (Air)')
             .onChange(value => this.physicsWorld.updateParameters({ k_air: value }));
+        fEnvironment.add(config, 'sleepThreshold', 0.00001, 0.01, 0.000001).name('عتبة سكون الكرة (Energy)')
+            .onChange(value => this.physicsWorld.updateParameters({ sleepThreshold: value }));
 
-        // 3. مجلد التحكم في معاملات الارتداد (الصدم الديناميكي)
-        const bounceFolder = gui.addFolder('💥 الارتداد والتصادم');
-        bounceFolder.add(config, 'e_ball', 0.80, 1.0, 0.01)
-            .name('ارتداد الكرات (e)')
+        const fCollisions = this.gui.addFolder('💥 مرونة التصادمات (Restitution)');
+        fCollisions.add(config, 'e_ball', 0.0, 1.0, 0.01).name('مرونة كرة مع كرة')
             .onChange(value => this.physicsWorld.updateParameters({ e_ball: value }));
-
-        bounceFolder.add(config, 'e_cushion', 0.50, 0.95, 0.01)
-            .name('ارتداد حواف المطاط (ec)')
+        fCollisions.add(config, 'e_cushion', 0.0, 1.0, 0.01).name('مرونة حواف الطاولة')
             .onChange(value => this.physicsWorld.updateParameters({ e_cushion: value }));
-
-        bounceFolder.add(config, 'cushion_friction', 0.0, 0.6, 0.01)
-            .name('احتكاك المطاط مماسياً')
+        fCollisions.add(config, 'cushion_friction', 0.0, 1.0, 0.05).name('احتكاك الكرة بالحافة')
             .onChange(value => this.physicsWorld.updateParameters({ cushion_friction: value }));
 
-        // 4. مجلد التحكم في قوة واتجاه ضربة العصا والـ Spin
-        const strikeFolder = gui.addFolder('🥍 إعدادات ضربة العصا');
-        strikeFolder.add(config, 'strikeImpulse', 0.1, 4.0, 0.05)
-            .name('قوة الدفع (J)')
-            .onChange(value => this.physicsWorld.updateParameters({ strikeImpulse: value }));
-
-        strikeFolder.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001)
-            .name('انحراف الدوران (Spin X)')
-            .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetX: value }));
-
-        strikeFolder.add(config, 'strikeOffsetY', -0.02, 0.02, 0.001)
-            .name('انحراف الدوران (Spin Y)')
-            .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetY: value }));
-
-        // 5. ربط قوى القوانين الخارجية المتواجدة بالمشروع (الرياح والحقل المغناطيسي) مع الـ GUI الخاص بها
-        if (this.physicsWorld.registeredForces) {
-            this.physicsWorld.registeredForces.forEach(force => {
-                const forceFolder = gui.addFolder(`🌀 قانون: ${force.name}`);
-                force.setupGUI(forceFolder);
-            });
-        }
-
-        // فتح القوائم افتراضياً لسهولة التعديل
-        clothFolder.open();
-        bounceFolder.open();
+        this.physicsWorld.registeredForces.forEach(force => {
+            const folder = this.gui.addFolder(`🔧 قانون خارجي: ${force.name}`);
+            force.setupGUI(folder);
+            folder.close();
+        });
     }
 
     initControlsInteraction() {
@@ -179,6 +206,57 @@ export class SimulationApp {
         window.addEventListener('pointerup', this.onPointerUp);
         window.addEventListener('resize', this.onWindowResize);
     }
+    initKeyboardSwitching() {
+    window.addEventListener('keydown', (event) => {
+        // التحقق من أن المستخدم لا يكتب داخل صندوق إدخال نصي (مثل الـ GUI إن وجد) لمنع التداخل
+        if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') return;
+
+        let targetId = null;
+
+        // فحص إذا كان الزر المكبوس هو أحد الأرقام من 1 إلى 9
+        // event.key يعطي القيمة النصية للمفتاح (مثلاً '1', '2'...)
+        if (event.key >= '1' && event.key <= '9') {
+            const num = parseInt(event.key);
+
+            if (event.metaKey) {
+                // 1. حالة الـ Shift: الأرقام من 1 إلى 7 تتحول إلى (9 إلى 15)
+                if (num >= 1 && num <= 7) {
+                    targetId = num + 8; // مثلاً Shift + 1 يعطي 9
+                }
+            } else {
+                // 2. الحالة العادية: الأرقام من 1 إلى 8 تعطي الكرات من 1 إلى 8 مباشرة
+                if (num >= 1 && num <= 8) {
+                    targetId = num;
+                }
+            }
+        } 
+        // 3. تخصيص زر الـ "0" أو زر المسافة "Space" للعودة إلى الكرة البيضاء (ID = 0)
+        else if (event.key === '0' || event.key === ' ') {
+            targetId = 0;
+            if (event.key === ' ') event.preventDefault(); // منع المتصفح من النزول لأسفل الصفحة عند ضغط Space
+        }
+
+        // إذا تم العثور على هدف متوافق، نقوم بتحديث القائمة المنسدلة وتنبيه واجهة المستخدم
+        if (targetId !== null) {
+            // التأكد من أن الكرة المطلوبة موجودة وغير ساقطة في الحفرة (اختياري حسب رغبتك)
+            const ballExists = this.ballMeshes.some(item => item.physics.id === targetId);
+            
+            if (ballExists && this.ballSelect) {
+                this.ballSelect.value = targetId;
+                
+                // إطلاق حدث 'change' برمجياً لضمان تحديث اللوحة فوراً دون انتظار الإطار التالي
+                this.ballSelect.dispatchEvent(new Event('change'));
+                
+                // تأثير بصري بسيط: جعل اللوحة تومض بالأخضر لثانية لمعرفة أن التغيير نجح عبر الكيبورد
+                const panel = document.getElementById('physics-telemetry-panel');
+                if (panel) {
+                    panel.style.borderColor = '#00ffaa';
+                    setTimeout(() => { panel.style.borderColor = '#334155'; }, 200);
+                }
+            }
+        }
+    });
+}
 
     onPointerDown(e) {
         const cueBall = this.ballMeshes[0].physics;
@@ -188,111 +266,16 @@ export class SimulationApp {
         }
     }
 
-    onPointerMove(e) {
-        this.cueManager.handlePointerMove(e);
-    }
-
-    onPointerUp() {
-        this.cueManager.handlePointerUp();
-        this.tableGraphics.controls.enabled = true;
-    }
-
-    onWindowResize() {
-        this.tableGraphics.handleResize();
-    }
+    onPointerMove(e) { this.cueManager.handlePointerMove(e); }
+    onPointerUp() { this.cueManager.handlePointerUp(); this.tableGraphics.controls.enabled = true; }
+    onWindowResize() { this.tableGraphics.handleResize(); }
 
     triggerAdvancedStrike() {
         const cueBall = this.ballMeshes[0].physics;
-
-        // إصلاح الأخطاء البرمجية للـ Scope والتحقق من سلامة كائنات العصا والفيزياء الحالية
         if (!cueBall || !cueBall.isSleeping || cueBall.isPocketted || this.cueManager.isStrikingAnimation) return;
-
-        // تفعيل بدء أنيميشن العصا البصري بطريقة سليمة لا تتعارض مع الدوران
         this.cueManager.strikeProgress = 0;
         this.cueManager.isStrikingAnimation = true;
         this.cueManager.cueMesh.visible = true;
-    }
-
-    initTelemetryDOM() {
-        const div = document.createElement('div');
-        div.style.position = 'absolute'; div.style.top = '20px'; div.style.left = '20px'; div.style.padding = '15px';
-        div.style.background = 'rgba(10, 10, 10, 0.9)'; div.style.color = '#00ffaa'; div.style.fontFamily = 'monospace';
-        div.style.borderRadius = '6px'; div.style.border = '1px solid #333'; div.style.pointerEvents = 'none'; div.style.width = '260px';
-        div.innerHTML = `
-            <h3 style="margin:0 0 8px 0; color:#fff; font-size:14px;">🎛️ لوحة المختبر البرمجي</h3>
-            <div>طاقة النظام الكلية: <span id="e-total">0</span> J</div>
-            <div>حالة البيضاء: <span id="cue-state">Sleeping</span></div>
-            <div style="color: #ffaa00; font-size:11px; margin-top:5px;">💡 اسحب بالماوس مع زر الأيمن (أو Shift) للتصويب</div>
-        `;
-        document.body.appendChild(div);
-        this.domETotal = document.getElementById('e-total');
-        this.domCueState = document.getElementById('cue-state');
-    }
-
-    initGUI() {
-        // 1. استخدام نفس اللوحة الرئيسية الحالية لديك
-        this.gui = new GUI({ title: '🕹️ لوحة هندسة القوانين الفيزيائية' });
-        const config = this.physicsWorld.config;
-
-        // 2. مجلد التحكم بالعصا والضربة (مدمج مع أحداث التحديث اللحظي)
-        const fStrike = this.gui.addFolder('🏑 التحكم بالعصا والضربة');
-        fStrike.add(config, 'strikeImpulse', 0.1, 5.0, 0.05)
-            .name('دفع الضربة (Impulse)')
-            .onChange(value => this.physicsWorld.updateParameters({ strikeImpulse: value }));
-            
-        fStrike.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001)
-            .name('انحراف أفقي (X Offset)')
-            .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetX: value }));
-            
-        fStrike.add(config, 'strikeOffsetY', -0.02, 0.02, 0.001)
-            .name('انحراف رأسي (Y Offset)')
-            .onChange(value => this.physicsWorld.updateParameters({ strikeOffsetY: value }));
-            
-        fStrike.add(this, 'triggerAdvancedStrike').name('🚀 إطلاق القوة');
-        fStrike.open();
-
-        // 3. مجلد البيئة والاحتكاك السطحي (تحديث فوري لمعادلات الانزلاق والتدحرج النقي)
-        const fEnvironment = this.gui.addFolder('🌍 البيئة والاحتكاك السطحي');
-        fEnvironment.add(config, 'gravity', 0.0, 25.0, 0.1)
-            .name('الجاذبية (g)')
-            .onChange(value => this.physicsWorld.updateParameters({ gravity: value }));
-            
-        fEnvironment.add(config, 'mu_sliding', 0.0, 0.8, 0.01)
-            .name('احتكاك الانزلاق (Sliding)')
-            .onChange(value => this.physicsWorld.updateParameters({ mu_sliding: value }));
-            
-        fEnvironment.add(config, 'mu_rolling', 0.0, 0.1, 0.001)
-            .name('احتكاك التدحرج (Rolling)')
-            .onChange(value => this.physicsWorld.updateParameters({ mu_rolling: value }));
-            
-        fEnvironment.add(config, 'k_air', 0.0, 0.05, 0.001)
-            .name('مقاومة الهواء (Air)')
-            .onChange(value => this.physicsWorld.updateParameters({ k_air: value }));
-            
-        fEnvironment.add(config, 'sleepThreshold', 0.00001, 0.01, 0.000001)
-            .name('عتبة سكون الكرة (Energy)')
-            .onChange(value => this.physicsWorld.updateParameters({ sleepThreshold: value }));
-
-        // 4. مجلد مرونة التصادمات بناءً على اشتقاقات دراسة الـ .md المرفقة
-        const fCollisions = this.gui.addFolder('💥 مرونة التصادمات (Restitution)');
-        fCollisions.add(config, 'e_ball', 0.0, 1.0, 0.01)
-            .name('مرونة كرة مع كرة')
-            .onChange(value => this.physicsWorld.updateParameters({ e_ball: value }));
-            
-        fCollisions.add(config, 'e_cushion', 0.0, 1.0, 0.01)
-            .name('مرونة حواف الطاولة')
-            .onChange(value => this.physicsWorld.updateParameters({ e_cushion: value }));
-            
-        fCollisions.add(config, 'cushion_friction', 0.0, 1.0, 0.05)
-            .name('احتكاك الكرة بالحافة')
-            .onChange(value => this.physicsWorld.updateParameters({ cushion_friction: value }));
-
-        // 5. ربط القوانين الخارجية الحالية (الرياح والحقل المغناطيسي) باللوحة الموحدة تلقائياً
-        this.physicsWorld.registeredForces.forEach(force => {
-            const folder = this.gui.addFolder(`🔧 قانون خارجي: ${force.name}`);
-            force.setupGUI(folder);
-            folder.close();
-        });
     }
 
     animate(timestamp) {
@@ -312,14 +295,12 @@ export class SimulationApp {
 
         const cueBall = this.ballMeshes[0].physics;
 
-        // إدارة الأنيميشن من خلال كلاس المدير
         if (this.cueManager.isStrikingAnimation) {
             this.cueManager.animateStrike(frameTime, cueBall);
         } else {
             this.cueManager.updateState(cueBall);
         }
 
-        // تحديث إحداثيات المشاهد وتدوير الكرات (تحديث متوافق مع Mesh و Group)
         for (let item of this.ballMeshes) {
             item.mesh.position.copy(item.physics.position);
             item.mesh.visible = !item.physics.isPocketted;
@@ -327,17 +308,70 @@ export class SimulationApp {
             if (!item.physics.isSleeping && !item.physics.isPocketted) {
                 const deltaRotation = item.physics.angularVelocity.clone().multiplyScalar(this.fixedTimeStep);
                 const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(deltaRotation.x, deltaRotation.y, deltaRotation.z, 'XYZ'));
-
-                // التطبيق المباشر السليم سواء كانت كرتنا مشهد Mesh أو كائن هجين Group
                 item.mesh.quaternion.multiplyQuaternions(quaternion, item.mesh.quaternion);
             }
         }
 
-        this.domETotal.innerText = this.physicsWorld.getTotalKineticEnergy().toFixed(5);
-        this.domCueState.innerText = cueBall.isPocketted ? '🕳️ سقطت في الحفرة' :
-            (cueBall.isSleeping ? '💤 ساكنة' : '🔥 تتحرك');
+        // 🔥 استدعاء دالة تحديث الحسابات الفيزيائية اللحظية وحقنها في لوحة الرصد الجانبية
+        this.updateTelemetryUI();
 
         this.tableGraphics.controls.update();
         this.tableGraphics.renderer.render(this.tableGraphics.scene, this.tableGraphics.camera);
+    }
+
+    /**
+     * دالة المعالجة الفيزيائية الفورية المضافة لرصد سرعة نقطة التلامس والطور الديناميكي للحركة
+     */
+    updateTelemetryUI() {
+        // 1. حساب ومراقبة طاقة المنظومة الشاملة لمنع حدوث أي تعليق أو تسريب
+        const totalEnergy = this.physicsWorld.getTotalKineticEnergy();
+        if (this.domETotal) this.domETotal.innerText = `${totalEnergy.toFixed(5)} J`;
+
+        if (!this.ballSelect) return;
+        const selectedId = parseInt(this.ballSelect.value) || 0;
+        const targetBallItem = this.ballMeshes.find(item => item.physics.id === selectedId);
+
+        if (targetBallItem) {
+            const ball = targetBallItem.physics;
+
+            // 2. تحديث الحالة العامة
+            if (this.domCueState) {
+                this.domCueState.innerText = ball.isPocketted ? '🕳️ POCKETTED' : (ball.isSleeping ? '💤 SLEEPING' : '🔥 ACTIVE');
+                this.domCueState.style.color = ball.isSleeping ? '#f59e0b' : '#10b981';
+            }
+
+            // 3. طاقة الكرة الفردية والسرعات الخطية والزاوية الإقليّدية
+            if (this.domBallKE) this.domBallKE.innerText = `${ball.getKineticEnergy().toFixed(5)} J`;
+            const vMag = ball.velocity.length();
+            const wMag = ball.angularVelocity.length();
+            if (this.domVelocity) this.domVelocity.innerText = `${vMag.toFixed(4)} m/s`;
+            if (this.domAngular) this.domAngular.innerText = `${wMag.toFixed(4)} rad/s`;
+
+            // 4. حساب سرعة نقطة التلامس النسبية الحامضية مع القماش: vc = v + w x r
+            const rVector = new THREE.Vector3(0, -ball.radius, 0);
+            const tangentialVelocity = new THREE.Vector3().crossVectors(ball.angularVelocity, rVector);
+            const v_relative = new THREE.Vector3().addVectors(ball.velocity, tangentialVelocity);
+            const vcMag = v_relative.length();
+
+            if (this.domVc) {
+                this.domVc.innerText = `${vcMag.toFixed(4)} m/s`;
+                // إعطاء إشارة حمراء إن كانت الكرة تنزلق (احتكاك نشط جارف للـ KE) وخضراء عند استقرارها في التدحرج
+                this.domVc.style.color = vcMag > 0.005 ? '#f43f5e' : '#10b981';
+            }
+
+            // 5. استنتاج وتحليل الطور الحركي الحالي (Motion Phase) من واقع المعادلات
+            if (this.domPhase) {
+                if (ball.isSleeping) {
+                    this.domPhase.innerText = "STATIONARY (سكون تام)";
+                    this.domPhase.style.color = "#94a3b8";
+                } else if (vcMag > 0.005) {
+                    this.domPhase.innerText = "SLIDING (طور الانزلاق)";
+                    this.domPhase.style.color = "#f43f5e";
+                } else {
+                    this.domPhase.innerText = "PURE ROLLING (تدحرج نقي)";
+                    this.domPhase.style.color = "#38bdf8";
+                }
+            }
+        }
     }
 }

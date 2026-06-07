@@ -7,19 +7,20 @@ export class PhysicsWorld {
         this.balls = [];
         this.registeredForces = [];
 
+        // داخل constructor() في ملف PhysicsWorld.js استبدل الـ config بهذا:
         this.config = {
             gravity: 9.81,
-            mu_sliding: 0.20,
-            mu_rolling: 0.015,
-            k_air: 0.005,
+            mu_sliding: 0.15,       // احتكاك انزلاق قماش مثالي
+            mu_rolling: 0.005,      // مقاومة تدحرج ناعمة تسمح برؤية الطور كاملاً
+            k_air: 0.001,           // تخميد هواء خفيف جداً
             e_ball: 0.96,
             e_cushion: 0.75,
             cushion_friction: 0.2,
-            sleepThreshold: 0.006,
+            sleepThreshold: 0.00005, // 🔥 تم خفضها جداً لضمان عدم إيقاف الكرات الممتعة ديناميكياً
             strikeImpulse: 0.9,
             strikeOffsetX: 0.0,
             strikeOffsetY: 0.0
-        };
+        };;
 
         this.tableBounds = { minX: -0.635, maxX: 0.635, minZ: -1.27, maxZ: 1.27 };
         this.pocketRadius = 0.045;
@@ -146,47 +147,47 @@ export class PhysicsWorld {
      * 3. تأثير الدوران المغزلي (spin coupling) الذي يعدل السرعة المماسية إضافياً
      */
     applyCushionCollision(ball, normal, e_c, mu_c) {
-    // 1. تفكيك السرعة الخطية إلى مركبة عمودية ومماسية
-    const vn = ball.velocity.dot(normal);
-    const vt = ball.velocity.clone().sub(normal.clone().multiplyScalar(vn));
-    
-    // 2. الارتداد العمودي (معامل الارتداد الطبيعي)
-    const vn_out = -e_c * vn;
-    
-    // 3. حساب السرعة المماسية بعد التصادم
-    //    نطبق احتكاكاً بسيطاً: السرعة المماسية تقل بنسبة (1 - mu_c) ولا تنعكس
-    //    هذا يمنع اكتساب سرعة وهمية ويحافظ على الزخم
-    let vt_out = vt.clone().multiplyScalar(1 - mu_c);
-    
-    // 4. التعامل مع الدوران المغزلي (spin) بشكل صحيح
-    //    يجب ألا نضيف سرعة خطية مباشرة، بل نعدل السرعة الزاوية فقط (يستهلك الاحتكاك جزءاً من الدوران)
-    //    ونضيف تأثيراً بسيطاً جداً على vt_out يعادل تبادل الزخم الزاوي مع الخطي (مقادير صغيرة جداً)
-    const r = ball.radius;
-    const spinY = ball.angularVelocity.y;
-    
-    if (Math.abs(spinY) > 1e-4) {
-        // تقدير السرعة الخطية التي قد تنتج عن تحول جزء صغير من spin إلى حركة خطية
-        // لكن بمعامل تخميد كبير جداً لتجنب التسارع الوهمي
-        // في الواقع، نقل spin إلى حركة خطية يحدث عبر الاحتكاك، وهو بالفعل ضمن mu_c
-        // لذلك نكتفي بتقليل spin تدريجياً
-        ball.angularVelocity.y *= (1 - mu_c * 0.5);
-        
-        // إضافة تأثير بسيط جداً على vt_out عند الجدران الجانبية (يحاكي دوران الكرة على الحافة)
-        // هذا الجزء اختياري ويمكن إزالته إذا استمرت المشكلة
-        if (Math.abs(normal.x) > 0.5) {
-            // جدار جانبي، التأثير على المحور Z
-            const influence = spinY * r * mu_c * 0.1;
-            vt_out.z += influence;
-        } else if (Math.abs(normal.z) > 0.5) {
-            // جدار أمامي/خلفي، التأثير على المحور X
-            const influence = spinY * r * mu_c * 0.1;
-            vt_out.x += influence;
+        // 1. تفكيك السرعة الخطية إلى مركبة عمودية ومماسية
+        const vn = ball.velocity.dot(normal);
+        const vt = ball.velocity.clone().sub(normal.clone().multiplyScalar(vn));
+
+        // 2. الارتداد العمودي (معامل الارتداد الطبيعي)
+        const vn_out = -e_c * vn;
+
+        // 3. حساب السرعة المماسية بعد التصادم
+        //    نطبق احتكاكاً بسيطاً: السرعة المماسية تقل بنسبة (1 - mu_c) ولا تنعكس
+        //    هذا يمنع اكتساب سرعة وهمية ويحافظ على الزخم
+        let vt_out = vt.clone().multiplyScalar(1 - mu_c);
+
+        // 4. التعامل مع الدوران المغزلي (spin) بشكل صحيح
+        //    يجب ألا نضيف سرعة خطية مباشرة، بل نعدل السرعة الزاوية فقط (يستهلك الاحتكاك جزءاً من الدوران)
+        //    ونضيف تأثيراً بسيطاً جداً على vt_out يعادل تبادل الزخم الزاوي مع الخطي (مقادير صغيرة جداً)
+        const r = ball.radius;
+        const spinY = ball.angularVelocity.y;
+
+        if (Math.abs(spinY) > 1e-4) {
+            // تقدير السرعة الخطية التي قد تنتج عن تحول جزء صغير من spin إلى حركة خطية
+            // لكن بمعامل تخميد كبير جداً لتجنب التسارع الوهمي
+            // في الواقع، نقل spin إلى حركة خطية يحدث عبر الاحتكاك، وهو بالفعل ضمن mu_c
+            // لذلك نكتفي بتقليل spin تدريجياً
+            ball.angularVelocity.y *= (1 - mu_c * 0.5);
+
+            // إضافة تأثير بسيط جداً على vt_out عند الجدران الجانبية (يحاكي دوران الكرة على الحافة)
+            // هذا الجزء اختياري ويمكن إزالته إذا استمرت المشكلة
+            if (Math.abs(normal.x) > 0.5) {
+                // جدار جانبي، التأثير على المحور Z
+                const influence = spinY * r * mu_c * 0.1;
+                vt_out.z += influence;
+            } else if (Math.abs(normal.z) > 0.5) {
+                // جدار أمامي/خلفي، التأثير على المحور X
+                const influence = spinY * r * mu_c * 0.1;
+                vt_out.x += influence;
+            }
         }
+
+        // 5. إعادة تركيب السرعة النهائية
+        ball.velocity.copy(vt_out.clone().add(normal.clone().multiplyScalar(vn_out)));
     }
-    
-    // 5. إعادة تركيب السرعة النهائية
-    ball.velocity.copy(vt_out.clone().add(normal.clone().multiplyScalar(vn_out)));
-}
 
     checkPocketCollisions() {
         for (let ball of this.balls) {
