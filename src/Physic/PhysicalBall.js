@@ -58,47 +58,51 @@ export class PhysicalBall {
      * تم تصحيح إجبار القيد الحركي للحفاظ على spin
      */
     applyStandardFriction(config, dt) {
-        if (this.isSleeping || this.isPocketted) return;
+    if (this.isSleeping || this.isPocketted) return;
 
-        const g = config.gravity;
-        const rVector = new THREE.Vector3(0, -this.radius, 0);
-        const tangentialVelocity = new THREE.Vector3().crossVectors(this.angularVelocity, rVector);
-        const v_relative = new THREE.Vector3().addVectors(this.velocity, tangentialVelocity);
+    const g = config.gravity;
+    const rVector = new THREE.Vector3(0, -this.radius, 0);
+    
+    // حساب سرعة نقطة التلامس اللحظية الحقيقية: vc = v + w x r
+    const tangentialVelocity = new THREE.Vector3().crossVectors(this.angularVelocity, rVector);
+    const v_relative = new THREE.Vector3().addVectors(this.velocity, tangentialVelocity);
+    const vcMag = v_relative.length();
 
-        if (v_relative.length() > 0.001) {
-            // حالة الانزلاق: استخدام قوانين الاحتكاك الحركي
-            const slidingMag = Physics.slidingFrictionMagnitude(config.mu_sliding, this.mass, g);
-            const frictionForce = v_relative.clone().normalize().negate().multiplyScalar(slidingMag);
+    // عتبة متناهية الدقة للفصل بين الانزلاق الحركي النشط والتدحرج النقي (1e-3 م/ث)
+    if (vcMag > 0.005) {
+        // [طور الانزلاق النشط]: الاحتكاك يقلل السرعة الخطية ويزيد/يعدل السرعة الزاوية معاً
+        const slidingMag = Physics.slidingFrictionMagnitude(config.mu_sliding, this.mass, g);
+        const frictionForce = v_relative.clone().normalize().negate().multiplyScalar(slidingMag);
+        
+        // تعديل السرعة الخطية (تباطؤ خطي)
+        this.velocity.addScaledVector(frictionForce.clone().divideScalar(this.mass), dt);
+        
+        // تعديل السرعة الزاوية (توليد عزم دوران يطرد الانزلاق ويدفع باتجاه التدحرج)
+        const torque = Physics.slidingTorque(rVector, frictionForce);
+        this.angularVelocity.addScaledVector(torque.divideScalar(this.inertia), dt);
+    } else {
+        // [طور التدحرج النقي]: تتدحرج الكرة وتبخر طاقتها ببطء شديد عبر مقاومة التدحرج
+        if (this.velocity.length() > 0.001) {
+            const rollingForce = Physics.rollingResistanceForce(config.mu_rolling, this.mass, g, this.velocity);
+            this.velocity.addScaledVector(rollingForce.divideScalar(this.mass), dt);
             
-            // التسارع الخطي
-            this.velocity.addScaledVector(frictionForce.divideScalar(this.mass), dt);
-            
-            // العزم الناتج عن الاحتكاك
-            const torque = Physics.slidingTorque(rVector, frictionForce);
-            this.angularVelocity.addScaledVector(torque.divideScalar(this.inertia), dt);
-        } else {
-            // حالة التدحرج النقي: استخدام مقاومة التدحرج مع إجبار القيد المنقح
-            if (this.velocity.length() > 0.001) {
-                const rollingForce = Physics.rollingResistanceForce(config.mu_rolling, this.mass, g, this.velocity);
-                this.velocity.addScaledVector(rollingForce.divideScalar(this.mass), dt);
-                
-                // إجبار القيد الحركي مع الحفاظ على ω_y (spin)
-                const newAngularVelocity = Physics.enforceRollingConstraint(this.velocity, this.radius, this.angularVelocity);
-                this.angularVelocity.copy(newAngularVelocity);
-            }
-        }
-
-        // مقاومة الهواء
-        this.velocity.addScaledVector(this.velocity.clone().negate().multiplyScalar(config.k_air), dt);
-
-        // تحديث الموقع
-        this.position.addScaledVector(this.velocity, dt);
-
-        // فحص السكون
-        if (this.getKineticEnergy() < config.sleepThreshold) {
-            this.velocity.set(0, 0, 0);
-            this.angularVelocity.set(0, 0, 0);
-            this.isSleeping = true;
+            // قيد التدحرج الطبيعي المنساب دون تصفير مباغت للـ Spin
+            const newAngularVelocity = Physics.enforceRollingConstraint(this.velocity, this.radius, this.angularVelocity);
+            this.angularVelocity.copy(newAngularVelocity);
         }
     }
+
+    // مقاومة تخميد الهواء
+    this.velocity.addScaledVector(this.velocity.clone().negate().multiplyScalar(config.k_air), dt);
+
+    // تحديث الموقع بناءً على السرعة النهائية المتولدة
+    this.position.addScaledVector(this.velocity, dt);
+
+    // فحص عتبة السكون العلمي: السكون يحدث عندما تقترب السرعات من الصفر المطلق وليس عند طاقات عالية
+    if (this.velocity.length() < 0.002 && this.angularVelocity.length() < 0.05) {
+        this.velocity.set(0, 0, 0);
+        this.angularVelocity.set(0, 0, 0);
+        this.isSleeping = true;
+    }
+}   
 }
