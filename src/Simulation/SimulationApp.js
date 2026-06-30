@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import GUI from 'lil-gui';
-import { PhysicsWorld, PhysicalBall } from './../Physic'; // 🔥 تم إصلاح مسار الاستيراد المكسور هنا
-import { WindBlowForce, MagneticCueBallForce } from './../IExternalForce.js';
-import { TableGraphics } from './TableGraphics.js';
-import { CueStickManager } from './CueStickManager.js';
+import {PhysicsWorld} from '../Physic/PhysicsWorld.js';
+import { PhysicalBall } from '../Physic/PhysicalBall.js';
+import { WindBlowForce, MagneticCueBallForce } from '../IExternalForce.js';
+import { TableGraphics } from '../Simulation/TableGraphics';
+import { CueStickManager } from '../Simulation/CueStickManager';
 
 export class SimulationApp {
     constructor() {
@@ -22,25 +23,24 @@ export class SimulationApp {
         this.physicsWorld.registerExternalForce(new WindBlowForce());
         this.physicsWorld.registerExternalForce(new MagneticCueBallForce());
 
-        // تهيئة الوحدات المنفصلة الرسومية والعصا
         this.tableGraphics = new TableGraphics(this);
         this.cueManager = new CueStickManager(this, this.tableGraphics.scene);
 
         this.initPhysicsWorld();
-        this.initTelemetryDOM();       // بناء لوحة القياسات الفيزيائية الجانبية المتطورة بالكامل HTML/DOM
-        this.initTelemetryBallSelect(); // شحن مصفوفة الـ ID داخل القائمة المنسدلة للرصد اللحظي
-        this.initKeyboardSwitching(); // 🔥 أضف هذا السطر هنا لتفعيل الاستماع للوحة المفاتيح
+        this.initTelemetryDOM();
+        this.initTelemetryBallSelect();
+        this.initKeyboardSwitching();
         this.initGUI();
         this.initControlsInteraction();
 
         this.lastTime = performance.now();
-        window.requestAnimationFrame(this.animate); // تم التخلص من الاستدعاء المزدوج لثبات الأداء
+        window.requestAnimationFrame(this.animate);
     }
 
     initPhysicsWorld() {
         const ballGeo = new THREE.SphereGeometry(this.ballRadius, 32, 32);
 
-        // 1. تهيئة الكرة البيضاء في مكانها السليم
+        // 1. الكرة البيضاء
         const cueBallPhys = new PhysicalBall(0, new THREE.Vector3(0, this.ballRadius, this.tableLength / 4), this.ballRadius, this.ballMass);
         const cueBallMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1 }));
         cueBallMesh.castShadow = true;
@@ -48,7 +48,7 @@ export class SimulationApp {
         this.physicsWorld.addBall(cueBallPhys);
         this.ballMeshes.push({ physics: cueBallPhys, mesh: cueBallMesh });
 
-        // 2. مصفوفة البيانات الدقيقة للـ 15 كرة (الأرقام، الألوان، ونوع التصميم السادة/المخطط)
+        // 2. مصفوفة بيانات الـ 15 كرة
         const rackData = [
             { id: 9, color: 0xffcc00, isStriped: true },
             { id: 7, color: 0x990011, isStriped: false },
@@ -73,49 +73,46 @@ export class SimulationApp {
         const rowSpacing = this.ballRadius * Math.sqrt(3) + 0.0001;
         const colSpacing = this.ballRadius * 2 + 0.0001;
 
-        // داخل دالة initPhysicsWorld() في ملف SimulationApp.js
         for (let row = 0; row < 5; row++) {
             for (let col = 0; col <= row; col++) {
-                const ballInfo = rackData[dataIndex++]; //
-                const x = (col - row * 0.5) * colSpacing; //
-                const z = apexZ - (row * rowSpacing); //[cite: 9]
-                const y = this.ballRadius; //[cite: 9]
+                const ballInfo = rackData[dataIndex++];
+                const x = (col - row * 0.5) * colSpacing;
+                const z = apexZ - (row * rowSpacing);
+                const y = this.ballRadius;
 
-                const ballPhys = new PhysicalBall(ballInfo.id, new THREE.Vector3(x, y, z), this.ballRadius, this.ballMass); //[cite: 9]
-                this.physicsWorld.addBall(ballPhys); //[cite: 9]
+                const ballPhys = new PhysicalBall(ballInfo.id, new THREE.Vector3(x, y, z), this.ballRadius, this.ballMass);
+                this.physicsWorld.addBall(ballPhys);
 
-                let ballMesh; //[cite: 9]
-                if (ballInfo.isStriped) { //[cite: 9]
-                    ballMesh = new THREE.Group(); //[cite: 9]
-                    const baseMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.1 })); //[cite: 9]
-                    baseMesh.castShadow = true; //[cite: 9]
-                    ballMesh.add(baseMesh); //[cite: 9]
+                let ballMesh;
+                if (ballInfo.isStriped) {
+                    ballMesh = new THREE.Group();
+                    const baseMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.1 }));
+                    baseMesh.castShadow = true;
+                    ballMesh.add(baseMesh);
 
-                    const stripeGeo = new THREE.CylinderGeometry(this.ballRadius + 0.0002, this.ballRadius + 0.0002, this.ballRadius * 0.8, 32, 1, true); //[cite: 9]
-                    const stripeMat = new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1, side: THREE.DoubleSide }); //[cite: 9]
-                    const stripeMesh = new THREE.Mesh(stripeGeo, stripeMat); //[cite: 9]
-                    stripeMesh.rotation.x = Math.PI / 2; //[cite: 9]
-                    ballMesh.add(stripeMesh); //[cite: 9]
+                    const stripeGeo = new THREE.CylinderGeometry(this.ballRadius + 0.0002, this.ballRadius + 0.0002, this.ballRadius * 0.8, 32, 1, true);
+                    const stripeMat = new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1, side: THREE.DoubleSide });
+                    const stripeMesh = new THREE.Mesh(stripeGeo, stripeMat);
+                    stripeMesh.rotation.x = Math.PI / 2;
+                    ballMesh.add(stripeMesh);
                 } else {
-                    ballMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1 })); //[cite: 9]
-                    ballMesh.castShadow = true; //[cite: 9]
+                    ballMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: ballInfo.color, roughness: 0.1 }));
+                    ballMesh.castShadow = true;
                 }
 
-                // 🔥 الحاقن الجديد: إضافة الرقم العائم فوق الكرة مباشرة
+                // الرقم العائم فوق الكرة
                 const numberSprite = this.createFloatingNumberSprite(ballInfo.id);
-                // نرفع الرقم قليلاً فوق القطب العلوي للكرة ليصبح عائماً بشكل واضخ
                 numberSprite.position.set(0, this.ballRadius * 1.6, 0);
                 ballMesh.add(numberSprite);
 
-                this.tableGraphics.scene.add(ballMesh); //[cite: 9]
-                // this.ballMeshes.push({ physics: ballPhys, mesh: ballMesh, sprite: numberSprite }); //[cite: 9]
-                this.ballMeshes.push({ physics: ballPhys, mesh: ballMesh, sprite: numberSprite }); //[cite: 9]
+                this.tableGraphics.scene.add(ballMesh);
+                this.ballMeshes.push({ physics: ballPhys, mesh: ballMesh, sprite: numberSprite });
             }
         }
     }
 
     /**
-     * توليد لوحة نصية عائمة (Sprite) برقم الكرة تلتفت دائماً صوب الكاميرا (Billboard)
+     * توليد لوحة نصية عائمة (Sprite) برقم الكرة تلتفت دائماً صوب الكاميرا
      */
     createFloatingNumberSprite(number) {
         const canvas = document.createElement('canvas');
@@ -123,41 +120,35 @@ export class SimulationApp {
         canvas.height = 128;
         const ctx = canvas.getContext('2d');
 
-        // 1. رسم خلفية دائرية صغيرة كـ Badge خلف الرقم (اختياري لجعلها مقروءة جداً)
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.25)'; // لون داكن متناسق مع اللوحة الجانبية
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.25)';
         ctx.beginPath();
         ctx.arc(64, 64, 50, 0, Math.PI * 2);
         ctx.fill();
 
-        // إطار مضيء حول دائرة الرقم
         ctx.strokeStyle = 'transparent';
         ctx.lineWidth = 6;
         ctx.stroke();
 
-        // 2. كتابة رقم الكرة في المنتصف
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 55px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(number, 64, 64);
 
-        // 3. تحويل الـ Canvas إلى Texture خاص بـ Three.js
         const texture = new THREE.CanvasTexture(canvas);
         const spriteMaterial = new THREE.SpriteMaterial({
             map: texture,
             transparent: true,
-            depthTest: true // لجعل الرقم يختفي إذا دخلت الكرة داخل الحفرة
+            depthTest: true
         });
 
         const sprite = new THREE.Sprite(spriteMaterial);
-        // ضبط الحجم المناسب للرقم العائم بالنسبة لحجم الكرة الصغير
         sprite.scale.set(0.12, 0.12, 1);
 
         return sprite;
     }
 
     initTelemetryDOM() {
-        // بناء اللوحة الجانبية الرادارية الفيزيائية المتطورة برمجياً لحقنها في الواجهة
         const panel = document.createElement('div');
         panel.id = 'physics-telemetry-panel';
         panel.style.cssText = `
@@ -185,7 +176,6 @@ export class SimulationApp {
         `;
         document.body.appendChild(panel);
 
-        // ربط معرفات الـ DOM الداخلية لتلقي البيانات المتغيرة بشكل لحظي أثناء الـ Animation Loop
         this.domETotal = document.getElementById('tel-sys-ke');
         this.domCueState = document.getElementById('tel-state');
         this.domBallKE = document.getElementById('tel-ball-ke');
@@ -256,48 +246,42 @@ export class SimulationApp {
         window.addEventListener('pointerup', this.onPointerUp);
         window.addEventListener('resize', this.onWindowResize);
     }
+
     initKeyboardSwitching() {
         window.addEventListener('keydown', (event) => {
-            // التحقق من أن المستخدم لا يكتب داخل صندوق إدخال نصي (مثل الـ GUI إن وجد) لمنع التداخل
             if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') return;
 
             let targetId = null;
 
-            // فحص إذا كان الزر المكبوس هو أحد الأرقام من 1 إلى 9
-            // event.key يعطي القيمة النصية للمفتاح (مثلاً '1', '2'...)
             if (event.key >= '1' && event.key <= '9') {
                 const num = parseInt(event.key);
 
-                if (event.metaKey) {
-                    // 1. حالة الـ Shift: الأرقام من 1 إلى 7 تتحول إلى (9 إلى 15)
+                // FIX: كانت تستخدم event.metaKey (مفتاح Cmd/Win) بدلاً من event.shiftKey
+                // وهذا يجعل اختصار "Shift + رقم" لا يعمل فعلياً على أغلب الأنظمة
+                if (event.shiftKey) {
+                    // حالة الـ Shift: الأرقام من 1 إلى 7 تتحول إلى (9 إلى 15)
                     if (num >= 1 && num <= 7) {
-                        targetId = num + 8; // مثلاً Shift + 1 يعطي 9
+                        targetId = num + 8;
                     }
                 } else {
-                    // 2. الحالة العادية: الأرقام من 1 إلى 8 تعطي الكرات من 1 إلى 8 مباشرة
+                    // الحالة العادية: الأرقام من 1 إلى 8 تعطي الكرات من 1 إلى 8 مباشرة
                     if (num >= 1 && num <= 8) {
                         targetId = num;
                     }
                 }
             }
-            // 3. تخصيص زر الـ "0" أو زر المسافة "Space" للعودة إلى الكرة البيضاء (ID = 0)
             else if (event.key === '0' || event.key === ' ') {
                 targetId = 0;
-                if (event.key === ' ') event.preventDefault(); // منع المتصفح من النزول لأسفل الصفحة عند ضغط Space
+                if (event.key === ' ') event.preventDefault();
             }
 
-            // إذا تم العثور على هدف متوافق، نقوم بتحديث القائمة المنسدلة وتنبيه واجهة المستخدم
             if (targetId !== null) {
-                // التأكد من أن الكرة المطلوبة موجودة وغير ساقطة في الحفرة (اختياري حسب رغبتك)
                 const ballExists = this.ballMeshes.some(item => item.physics.id === targetId);
 
                 if (ballExists && this.ballSelect) {
                     this.ballSelect.value = targetId;
-
-                    // إطلاق حدث 'change' برمجياً لضمان تحديث اللوحة فوراً دون انتظار الإطار التالي
                     this.ballSelect.dispatchEvent(new Event('change'));
 
-                    // تأثير بصري بسيط: جعل اللوحة تومض بالأخضر لثانية لمعرفة أن التغيير نجح عبر الكيبورد
                     const panel = document.getElementById('physics-telemetry-panel');
                     if (panel) {
                         panel.style.borderColor = '#00ffaa';
@@ -352,36 +336,31 @@ export class SimulationApp {
         }
 
         for (let item of this.ballMeshes) {
-            item.mesh.position.copy(item.physics.position); //[cite: 9]
-            item.mesh.visible = !item.physics.isPocketted; //[cite: 9]
+            item.mesh.position.copy(item.physics.position);
+            item.mesh.visible = !item.physics.isPocketted;
 
-            if (!item.physics.isSleeping && !item.physics.isPocketted) { //[cite: 9]
-                const deltaRotation = item.physics.angularVelocity.clone().multiplyScalar(this.fixedTimeStep); //[cite: 9]
-                const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(deltaRotation.x, deltaRotation.y, deltaRotation.z, 'XYZ')); //[cite: 9]
-                item.mesh.quaternion.multiplyQuaternions(quaternion, item.mesh.quaternion); //[cite: 9]
+            if (!item.physics.isSleeping && !item.physics.isPocketted) {
+                const deltaRotation = item.physics.angularVelocity.clone().multiplyScalar(this.fixedTimeStep);
+                const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(deltaRotation.x, deltaRotation.y, deltaRotation.z, 'XYZ'));
+                item.mesh.quaternion.multiplyQuaternions(quaternion, item.mesh.quaternion);
             }
 
-            // 🔥 الحاقن الجديد: إلغاء تأثير دوران الكرة على الرقم العائم ليبقى ثابتاً للأعلى ومقروءاً
+            // إلغاء تأثير دوران الكرة على الرقم العائم ليبقى ثابتاً للأعلى
             if (item.sprite) {
-                // نأخذ معكوس دوران الكرة ونطبقه على الـ Sprite ليظل رأسه دائماً متجهاً لأعلى الطاولة
                 item.sprite.quaternion.copy(item.mesh.quaternion).invert();
             }
         }
 
-        // 🔥 استدعاء دالة تحديث الحسابات الفيزيائية اللحظية وحقنها في لوحة الرصد الجانبية
         this.updateTelemetryUI();
-
-
 
         this.tableGraphics.controls.update();
         this.tableGraphics.renderer.render(this.tableGraphics.scene, this.tableGraphics.camera);
     }
 
     /**
-     * دالة المعالجة الفيزيائية الفورية المضافة لرصد سرعة نقطة التلامس والطور الديناميكي للحركة
+     * دالة المعالجة الفيزيائية الفورية لرصد سرعة نقطة التلامس والطور الديناميكي للحركة
      */
     updateTelemetryUI() {
-        // 1. حساب ومراقبة طاقة المنظومة الشاملة لمنع حدوث أي تعليق أو تسريب
         const totalEnergy = this.physicsWorld.getTotalKineticEnergy();
         if (this.domETotal) this.domETotal.innerText = `${totalEnergy.toFixed(5)} J`;
 
@@ -392,20 +371,17 @@ export class SimulationApp {
         if (targetBallItem) {
             const ball = targetBallItem.physics;
 
-            // 2. تحديث الحالة العامة
             if (this.domCueState) {
                 this.domCueState.innerText = ball.isPocketted ? '🕳️ POCKETTED' : (ball.isSleeping ? '💤 SLEEPING' : '🔥 ACTIVE');
                 this.domCueState.style.color = ball.isSleeping ? '#f59e0b' : '#10b981';
             }
 
-            // 3. طاقة الكرة الفردية والسرعات الخطية والزاوية الإقليّدية
             if (this.domBallKE) this.domBallKE.innerText = `${ball.getKineticEnergy().toFixed(5)} J`;
             const vMag = ball.velocity.length();
             const wMag = ball.angularVelocity.length();
             if (this.domVelocity) this.domVelocity.innerText = `${vMag.toFixed(4)} m/s`;
             if (this.domAngular) this.domAngular.innerText = `${wMag.toFixed(4)} rad/s`;
 
-            // 4. حساب سرعة نقطة التلامس النسبية الحامضية مع القماش: vc = v + w x r
             const rVector = new THREE.Vector3(0, -ball.radius, 0);
             const tangentialVelocity = new THREE.Vector3().crossVectors(ball.angularVelocity, rVector);
             const v_relative = new THREE.Vector3().addVectors(ball.velocity, tangentialVelocity);
@@ -413,11 +389,9 @@ export class SimulationApp {
 
             if (this.domVc) {
                 this.domVc.innerText = `${vcMag.toFixed(4)} m/s`;
-                // إعطاء إشارة حمراء إن كانت الكرة تنزلق (احتكاك نشط جارف للـ KE) وخضراء عند استقرارها في التدحرج
                 this.domVc.style.color = vcMag > 0.005 ? '#f43f5e' : '#10b981';
             }
 
-            // 5. استنتاج وتحليل الطور الحركي الحالي (Motion Phase) من واقع المعادلات
             if (this.domPhase) {
                 if (ball.isSleeping) {
                     this.domPhase.innerText = "STATIONARY (سكون تام)";

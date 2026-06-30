@@ -13,7 +13,6 @@ export class PhysicalBall {
         this.radius = radius;
         this.mass = mass;
 
-        // استخدام قانون عزم القصور الذاتي من PhysicsLaws
         this.inertia = Physics.momentOfInertiaSolidSphere(mass, radius);
         this.inverseMass = 1 / mass;
         this.isSleeping = true;
@@ -22,7 +21,7 @@ export class PhysicalBall {
     }
 
     /**
-     * حساب الطاقة الحركية الكلية باستخدام القوانين المعزولة
+     * حساب الطاقة الحركية الكلية
      */
     getKineticEnergy() {
         const linearKE = Physics.linearKineticEnergy(this.mass, this.velocity);
@@ -32,42 +31,44 @@ export class PhysicalBall {
 
     /**
      * تطبيق ضربة العصا المتقدمة
-     * الآن تستخدم Physics.angularVelocityFromImpulse
      */
     applyAdvancedStrike(impulseMagnitude, strikeDirection, offsetX, offsetY) {
-    this.isSleeping = false;
+        this.isSleeping = false;
 
-    // 1. تحويل اتجاه الضربة إلى متجه وحدة متناسق (Forward)
-    const forward = strikeDirection.clone().normalize();
+        // FIX: تقييد إزاحة نقطة الضرب لمنع تسديدة وهمية (miscue) ينتج عنها عزم
+        // دوران غير واقعي على الإطلاق — نقطة التلامس يجب أن تبقى ضمن سطح الكرة الفعلي
+        const maxOffsetMag = this.radius * 0.7;
+        const offsetMag = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
+        if (offsetMag > maxOffsetMag) {
+            const scale = maxOffsetMag / offsetMag;
+            offsetX *= scale;
+            offsetY *= scale;
+        }
 
-    // 2. تطبيق النبضة الخطية
-    const linearImpulse = forward.clone().multiplyScalar(impulseMagnitude);
-    this.velocity.add(Physics.linearVelocityFromImpulse(linearImpulse, this.mass));
+        const forward = strikeDirection.clone().normalize();
 
-    // 🔥 الحل الهندي المُنقذ: بناء جملة إحداثيات محلية (Local Basis) تدور مع اتجاه العصا
-    const up = new THREE.Vector3(0, 1, 0); // المحور الرأسي الثابت للطاولة
-    
-    // المحور الأفقي الجانبي المتعامد مع العصا
-    const right = new THREE.Vector3().crossVectors(forward, up).normalize();
-    
-    // المحور العمودي المتعامد تماماً مع خط تسديد العصا
-    const perpUp = new THREE.Vector3().crossVectors(right, forward).normalize();
+        // تطبيق النبضة الخطية
+        const linearImpulse = forward.clone().multiplyScalar(impulseMagnitude);
+        this.velocity.add(Physics.linearVelocityFromImpulse(linearImpulse, this.mass));
 
-    // حساب ذراع العزم الحقيقي: 
-    // - يبدأ من نقطة التلامس في مؤخرة الكرة عكس اتجاه الضربة (forward * -radius)
-    // - مضافاً إليه الإزاحات الموجهة محلياً مع زاوية ميلان العصا (right * offsetX) و (perpUp * offsetY)
-    const contactPointOffset = new THREE.Vector3()
-        .addScaledVector(forward, -this.radius)
-        .addScaledVector(right, offsetX)
-        .addScaledVector(perpUp, offsetY);
+        // بناء جملة إحداثيات محلية تدور مع اتجاه العصا
+        const up = new THREE.Vector3(0, 1, 0);
+        const right = new THREE.Vector3().crossVectors(forward, up).normalize();
+        const perpUp = new THREE.Vector3().crossVectors(right, forward).normalize();
 
-    // 3. حساب عزم النبضة الدوراني بناءً على ذراع العزم الفيزيائي الصحيح
-    const deltaOmega = Physics.angularVelocityFromImpulse(linearImpulse, contactPointOffset, this.inertia);
-    this.angularVelocity.add(deltaOmega);
-}
+        // حساب ذراع العزم الحقيقي
+        const contactPointOffset = new THREE.Vector3()
+            .addScaledVector(forward, -this.radius)
+            .addScaledVector(right, offsetX)
+            .addScaledVector(perpUp, offsetY);
+
+        // حساب عزم النبضة الدوراني
+        const deltaOmega = Physics.angularVelocityFromImpulse(linearImpulse, contactPointOffset, this.inertia);
+        this.angularVelocity.add(deltaOmega);
+    }
 
     /**
-     * تطبيق ضربة عند النقطة المثالية (Sweet Spot) للحصول على تدحرج نقي فوراً
+     * تطبيق ضربة عند النقطة المثالية (Sweet Spot)
      */
     applySweetSpotStrike(impulseMagnitude, strikeDirection) {
         const offsetY = Physics.sweetSpotOffset(this.radius);
@@ -76,61 +77,75 @@ export class PhysicalBall {
 
     /**
      * معالجة الاحتكاك والانتقال الديناميكي من الانزلاق إلى التدحرج النقي
-     * تم تصحيح إجبار القيد الحركي للحفاظ على spin
      */
     applyStandardFriction(config, dt) {
-    if (this.isSleeping || this.isPocketted) return;
+        if (this.isSleeping || this.isPocketted) return;
 
-    const g = config.gravity;
-    const rVector = new THREE.Vector3(0, -this.radius, 0);
-    
-    // 1. حساب سرعة نقطة التلامس اللحظية الحقيقية
-    const tangentialVelocity = new THREE.Vector3().crossVectors(this.angularVelocity, rVector);
-    const v_relative = new THREE.Vector3().addVectors(this.velocity, tangentialVelocity);
-    const vcMag = v_relative.length();
+        const g = config.gravity;
+        const rVector = new THREE.Vector3(0, -this.radius, 0);
 
-    // 2. تطبيق قوانين الاحتكاك الأساسية (انزلاق أو تدحرج)
-    if (vcMag > 0.0185) {
-        // [طور الانزلاق]
-        const slidingMag = Physics.slidingFrictionMagnitude(config.mu_sliding, this.mass, g);
-        const frictionForce = v_relative.clone().normalize().negate().multiplyScalar(slidingMag);
-        
-        this.velocity.addScaledVector(frictionForce.clone().divideScalar(this.mass), dt);
-        
-        const torque = Physics.slidingTorque(rVector, frictionForce);
-        this.angularVelocity.addScaledVector(torque.divideScalar(this.inertia), dt);
-    } else {
-        // [طور التدحرج النقي]
-        if (this.velocity.length() > 0.001) {
-            const rollingForce = Physics.rollingResistanceForce(config.mu_rolling, this.mass, g, this.velocity);
-            this.velocity.addScaledVector(rollingForce.divideScalar(this.mass), dt);
-            
+        // حساب سرعة نقطة التلامس اللحظية
+        const tangentialVelocity = new THREE.Vector3().crossVectors(this.angularVelocity, rVector);
+        const v_relative = new THREE.Vector3().addVectors(this.velocity, tangentialVelocity);
+        const vcMag = v_relative.length();
+
+        if (vcMag > 0.0185) {
+            // [طور الانزلاق]
+            const slidingMag = Physics.slidingFrictionMagnitude(config.mu_sliding, this.mass, g);
+            const frictionForce = v_relative.clone().normalize().negate().multiplyScalar(slidingMag);
+
+            const deltaV = frictionForce.clone().divideScalar(this.mass).multiplyScalar(dt);
+            const torque = Physics.slidingTorque(rVector, frictionForce);
+            const deltaOmega = torque.clone().divideScalar(this.inertia).multiplyScalar(dt);
+
+            // FIX: عند اقتراب سرعة نقطة التلامس من الصفر، كانت دفعة الاحتكاك
+            // الثابتة (Δv, Δω) تتجاوز (Overshoot) قيمة vc الفعلية في خطوة واحدة،
+            // فتعكس اتجاهها وتسبب اهتزازاً أبدياً (Limit Cycle) حول نقطة التوازن
+            // بدلاً من الاستقرار. هنا نُقيّد الدفعة كي لا تتجاوز إزالة vc بالكامل
+            const deltaVc = deltaV.clone().add(new THREE.Vector3().crossVectors(deltaOmega, rVector));
+            const deltaVcMag = deltaVc.length();
+            if (deltaVcMag > vcMag) {
+                const clampScale = vcMag / deltaVcMag;
+                deltaV.multiplyScalar(clampScale);
+                deltaOmega.multiplyScalar(clampScale);
+            }
+
+            this.velocity.add(deltaV);
+            this.angularVelocity.add(deltaOmega);
+        } else {
+            // [طور التدحرج النقي]
+            if (this.velocity.length() > 0.001) {
+                const rollingForce = Physics.rollingResistanceForce(config.mu_rolling, this.mass, g, this.velocity);
+                this.velocity.addScaledVector(rollingForce.divideScalar(this.mass), dt);
+            }
+
+            // FIX: تم نقل تصحيح الدوران خارج شرط السرعة الدنيا. كانت العملية تُحجب
+            // عندما تهبط السرعة الخطية تحت 0.001، مما يترك دوراناً متبقياً من ارتطام
+            // سابق بالجدار (لم يُعدَّل اتجاهه) عالقاً للأبد ويدفع الكرة للتحرك من جديد
             const newAngularVelocity = Physics.enforceRollingConstraint(this.velocity, this.radius, this.angularVelocity);
             this.angularVelocity.copy(newAngularVelocity);
         }
+
+        // إخماد الدوران المغزلي العمودي حول محور Y (Spin Damping)
+        if (Math.abs(this.angularVelocity.y) > 0.01) {
+            // FIX: كانت القيمة 0.15 تمثل عملياً ثابت زمني للتبدد ≈ 6.7 ثانية، أي أن أي
+            // سرعة دوران مغزلية كبيرة كانت تأخذ عشرات الثواني لتصل للصفر. تم رفعها إلى
+            // 2.0 لتعطي ثابتاً زمنياً ≈ 0.5 ثانية وتبدداً واقعياً خلال 1-2 ثانية تقريباً
+            const torsionalDamping = 2.0;
+            this.angularVelocity.y -= this.angularVelocity.y * torsionalDamping * dt;
+        }
+
+        // مقاومة الهواء
+        this.velocity.addScaledVector(this.velocity.clone().negate().multiplyScalar(config.k_air), dt);
+
+        // تحديث الموقع
+        this.position.addScaledVector(this.velocity, dt);
+
+        // فحص عتبة السكون
+        if (this.velocity.length() < 0.002 && this.angularVelocity.length() < 0.0355) {
+            this.velocity.set(0, 0, 0);
+            this.angularVelocity.set(0, 0, 0);
+            this.isSleeping = true;
+        }
     }
-
-    // 🔥 الحاقن الجديد المُنقذ: إخماد الدوران المغزلي العمودي حول محور Y (Spin Damping)
-    // حتى لو كانت الكرة ثابتة خطياً، فإن احتكاك القماش يفرمل الدوران المغزلي ببطء
-    if (Math.abs(this.angularVelocity.y) > 0.01) {
-        // معامل تخميد مخصص للدوران المغزلي (يمكن تعديله من الـ config لاحقاً، القيمة 0.15 مثالية جداً)
-        const torsionalDamping = 0.15; 
-        this.angularVelocity.y -= this.angularVelocity.y * torsionalDamping * dt;
-    }
-
-    // 3. مقاومة الهواء العامة
-    this.velocity.addScaledVector(this.velocity.clone().negate().multiplyScalar(config.k_air), dt);
-
-    // 4. تحديث الموقع بناءً على السرعات المعدلة
-    this.position.addScaledVector(this.velocity, dt);
-
-    // 5. فحص عتبة السكون العلمي الصارم:
-    // يجب ألا تنام الكرة إلا إذا سكنت حركتها الخطية ودورانها حول جميع المحاور (بما فيها Y)
-    if (this.velocity.length() < 0.002 && this.angularVelocity.length() < 0.0355) {
-    // if (this.velocity.length() < 0.002 && this.angularVelocity.length() < 0.05) {
-        this.velocity.set(0, 0, 0);
-        this.angularVelocity.set(0, 0, 0);
-        this.isSleeping = true;
-    }
-}   
 }
