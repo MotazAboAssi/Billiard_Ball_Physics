@@ -16,12 +16,17 @@ export class PhysicsWorld {
             e_cushion: 0.75,
             cushion_friction: 0.2,
             sleepThreshold: 0.00005,
-            strikeImpulse: 0.9,
+            strikeImpulse: 0.6,
             strikeOffsetX: 0.0,
             strikeOffsetY: 0.0
         };
 
+        // Callbacks — يُعيِّنهما SimulationApp لتتبع اللعبة
+        this.onBallPocketed        = null;  // (ballId) — عند تهريب أي كرة
+        this.onCueBallFirstContact = null;  // (otherId) — أول تلامس للكرة البيضاء
+
         this.tableBounds = { minX: -0.635, maxX: 0.635, minZ: -1.27, maxZ: 1.27 };
+
         this.pocketRadius = 0.045;
         this.pockets = [
             new THREE.Vector3(-0.635, 0, -1.27), new THREE.Vector3(0.635, 0, -1.27),
@@ -111,6 +116,12 @@ export class PhysicsWorld {
                     b2.velocity.addScaledVector(impulse, b2.inverseMass);
                     b1.isSleeping = false;
                     b2.isSleeping = false;
+
+                    // إشعار اللعبة بأول تلامس للكرة البيضاء
+                    if (this.onCueBallFirstContact) {
+                        if (b1.id === 0) this.onCueBallFirstContact(b2.id);
+                        else if (b2.id === 0) this.onCueBallFirstContact(b1.id);
+                    }
                 }
             }
         }
@@ -199,6 +210,7 @@ export class PhysicsWorld {
                         ball.angularVelocity.set(0, 0, 0);
                         ball.isSleeping = true;
                         ball.position.y = -this.pocketRadius * 2;
+                        if (this.onBallPocketed) this.onBallPocketed(ball.id);
                     }
                 }
             }
