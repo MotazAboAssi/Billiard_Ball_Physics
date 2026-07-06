@@ -141,11 +141,24 @@ export class PhysicalBall {
         // تحديث الموقع
         this.position.addScaledVector(this.velocity, dt);
 
-        // فحص عتبة السكون
+        // فحص عتبة السكون — لكن لا توقف الكرة إذا كانت قريبة من حفرة
         if (this.velocity.length() < 0.002 && this.angularVelocity.length() < 0.0355) {
-            this.velocity.set(0, 0, 0);
-            this.angularVelocity.set(0, 0, 0);
-            this.isSleeping = true;
+            // FIX: تحقق من قرب أي حفرة قبل إيقاف الكرة — كرة بطيئة بالقرب من
+            // الحفرة يجب أن تُترك لجاذبية الحفرة لتُكمل دخولها
+            const nearPocket = this.worldBallsRef && (() => {
+                // نصل للحفر من خلال worldBallsRef (مرجع عالم الفيزياء)
+                if (!this._pocketsRef) return false;
+                return this._pocketsRef.some(p => {
+                    const dx = p.x - this.position.x;
+                    const dz = p.z - this.position.z;
+                    return Math.sqrt(dx * dx + dz * dz) < this._pocketRadius * 2.2;
+                });
+            })();
+            if (!nearPocket) {
+                this.velocity.set(0, 0, 0);
+                this.angularVelocity.set(0, 0, 0);
+                this.isSleeping = true;
+            }
         }
     }
 }

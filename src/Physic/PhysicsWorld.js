@@ -27,16 +27,20 @@ export class PhysicsWorld {
 
         this.tableBounds = { minX: -0.635, maxX: 0.635, minZ: -1.27, maxZ: 1.27 };
 
-        this.pocketRadius = 0.045;
+        this.pocketRadius = 0.047;
+        // FIX: الحفر الزاوية كانت عند حافة الطاولة تماماً مما يجعل الكرة ترتد
+        // بالحائط قبل أن تصل إليها — إزاحتها قليلاً للداخل يصحح الـ hitbox
         this.pockets = [
-            new THREE.Vector3(-0.635, 0, -1.27), new THREE.Vector3(0.635, 0, -1.27),
-            new THREE.Vector3(-0.635, 0, 0),     new THREE.Vector3(0.635, 0, 0),
-            new THREE.Vector3(-0.635, 0, 1.27),  new THREE.Vector3(0.635, 0, 1.27)
+            new THREE.Vector3(-0.618, 0, -1.252), new THREE.Vector3(0.618, 0, -1.252),
+            new THREE.Vector3(-0.638, 0,  0),     new THREE.Vector3(0.638, 0,  0),
+            new THREE.Vector3(-0.618, 0,  1.252), new THREE.Vector3(0.618, 0,  1.252)
         ];
     }
 
     addBall(ball) {
-        ball.worldBallsRef = this.balls;
+        ball.worldBallsRef  = this.balls;
+        ball._pocketsRef    = this.pockets;
+        ball._pocketRadius  = this.pocketRadius;
         this.balls.push(ball);
     }
 
@@ -75,9 +79,11 @@ export class PhysicsWorld {
             }
         }
 
+        // FIX: الحفر أولاً — كانت resolveCushionCollisions تُطبَّق قبل checkPocketCollisions
+        // فتُرتد الكرة عن الحائط قبل أن تُكتشف الحفرة في الزوايا
+        this.checkPocketCollisions();
         this.resolveBallCollisions();
         this.resolveCushionCollisions();
-        this.checkPocketCollisions();
     }
 
     resolveBallCollisions() {
@@ -133,6 +139,16 @@ export class PhysicsWorld {
 
         for (let ball of this.balls) {
             if (ball.isSleeping || ball.isPocketted) continue;
+
+            // FIX: لا ترتد الكرة عن الحائط إذا كانت قريبة من حفرة
+            // وإلا ستُعيق الحفر الزاوية عن التقاط الكرات المارة عليها
+            const nearPocket = this.pockets.some(p => {
+                const dx = p.x - ball.position.x;
+                const dz = p.z - ball.position.z;
+                return Math.sqrt(dx * dx + dz * dz) < this.pocketRadius * 1.8;
+            });
+            if (nearPocket) continue;
+
             let hit = false;
 
             if (ball.position.x - ball.radius < this.tableBounds.minX) {

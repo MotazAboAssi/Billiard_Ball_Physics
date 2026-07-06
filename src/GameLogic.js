@@ -150,9 +150,15 @@ export class GameLogic {
 
         // — مخالفة: لمس كرة خاطئة أولاً —
         const myGroup = this.playerGroups[this.currentPlayer];
+        // FIX: كان يستخدم allPocketedIds الكاملة (بعد الضربة) لتحديد هل الدور
+        // على الكرة 8، مما يُفسد الحكم عند تهريب آخر كرة في المجموعة:
+        // تُهرَّب الكرة → تُضاف لـ allPocketedIds → _hasRemaining يعيد false
+        // → onEightBall = true → لمس المجموعة أولاً يُعدّ مخالفة خطأً.
+        // الحل: استخدام حالة ما قبل الضربة لهذا الحكم فقط.
+        const allPocketedBeforeShot = allPocketedIds.filter(id => !pocketed.includes(id));
         if (this.firstContactId !== null && myGroup !== BallGroup.NONE) {
             const contactGroup = this._groupOf(this.firstContactId);
-            const onEightBall  = !this._hasRemaining(myGroup, allPocketedIds);
+            const onEightBall  = !this._hasRemaining(myGroup, allPocketedBeforeShot);
             const legalFirst   = onEightBall
                 ? (contactGroup === BallGroup.EIGHT)
                 : (contactGroup === myGroup);
@@ -192,9 +198,15 @@ export class GameLogic {
         });
 
         if (wrongPocketed.length > 0) {
-            result.nextPlayer = this._other();
-            result.ballInHand = true;
-            result.message    = `⚠️ مخالفة! تهريب كرة خاطئة. الكرة لـ اللاعب ${result.nextPlayer}`;
+            if (updatedGroup === BallGroup.NONE) {
+                // طاولة مفتوحة + نوعان في ضربة واحدة: ليست مخالفة، تبديل الدور فقط
+                result.nextPlayer = this._other();
+                result.message    = `🎯 طاولة مفتوحة — نوعان مُهربان. دور اللاعب ${result.nextPlayer}`;
+            } else {
+                result.nextPlayer = this._other();
+                result.ballInHand = true;
+                result.message    = `⚠️ مخالفة! تهريب كرة خاطئة. الكرة لـ اللاعب ${result.nextPlayer}`;
+            }
 
         } else if (correctPocketed.length > 0) {
             result.nextPlayer = this.currentPlayer;

@@ -39,8 +39,9 @@ export class SimulationApp {
         this.raycaster         = new THREE.Raycaster();
         this.mouse             = new THREE.Vector2();
         this.tablePlane        = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.ballRadius);
-        this.ballInHandPos     = new THREE.Vector3();
-        this.ballInHandGhost   = null;
+        this.ballInHandPos          = new THREE.Vector3();
+        this.ballInHandGhost        = null;
+        this.ballInHandPlacementValid = true;
 
         this.physicsWorld.registerExternalForce(new WindBlowForce());
         this.physicsWorld.registerExternalForce(new MagneticCueBallForce());
@@ -334,11 +335,10 @@ export class SimulationApp {
         const remaining = ids.filter(id => !this.allPocketedIds.includes(id));
         const pocketed  = ids.filter(id =>  this.allPocketedIds.includes(id));
 
-        hud[`p${player}Balls`].textContent =
+        // FIX: كانت textContent تعرض وسوم HTML كنص خام — innerHTML يفسّرها صحيحاً
+        hud[`p${player}Balls`].innerHTML =
             remaining.map(() => '●').join('') +
-            // '<span style="opacity:.3">' +
-            pocketed.map(() => '●').join('') ;
-            //  + '</span>';
+            '<span style="opacity:.3">' + pocketed.map(() => '●').join('') + '</span>';
 
         // هل انتهى من مجموعته؟ أظهر مؤشر الكرة 8
         const eightPocketed = this.allPocketedIds.includes(8);
@@ -545,9 +545,17 @@ export class SimulationApp {
 
         this.ballInHandGhost.position.set(target.x, this.ballRadius, target.z);
         this.ballInHandPos.copy(this.ballInHandGhost.position);
+
+        // FIX: تلوين الشبح أحمر عند موضع ممنوع (داخل حفرة أو فوق كرة)
+        this.ballInHandPlacementValid = this._isValidPlacement(target);
+        this.ballInHandGhost.material.color.setHex(
+            this.ballInHandPlacementValid ? 0xffffff : 0xff3333
+        );
     }
 
     _placeCueBallAtGhost() {
+        // FIX: رفض الوضع إذا كانت النقطة داخل حفرة أو فوق كرة أخرى
+        if (!this.ballInHandPlacementValid) return;
         const cueBall = this.ballMeshes[0].physics;
         cueBall.position.copy(this.ballInHandPos);
         cueBall.velocity.set(0, 0, 0);
@@ -563,6 +571,27 @@ export class SimulationApp {
         this.updateGameUI();
     }
 
+    /** يتحقق أن الموضع المقترح ليس داخل حفرة وليس فوق كرة أخرى */
+    _isValidPlacement(pos) {
+        const r = this.ballRadius;
+        for (const pocket of this.physicsWorld.pockets) {
+            const dx = pocket.x - pos.x;
+            const dz = pocket.z - pos.z;
+            if (Math.sqrt(dx * dx + dz * dz) < this.physicsWorld.pocketRadius + r) {
+                return false;
+            }
+        }
+        for (const item of this.ballMeshes) {
+            if (item.physics.id === 0 || item.physics.isPocketted) continue;
+            const dx = item.physics.position.x - pos.x;
+            const dz = item.physics.position.z - pos.z;
+            if (Math.sqrt(dx * dx + dz * dz) < r * 2.1) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     initKeyboardSwitching() {
         window.addEventListener('keydown', (event) => {
             if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT') return;
@@ -575,9 +604,12 @@ export class SimulationApp {
                 } else {
                     if (num >= 1 && num <= 8) targetId = num;
                 }
-            } else if (event.key === '0' || event.key === ' ') {
+            } else if (event.key === '0') {
                 targetId = 0;
-                if (event.key === ' ') event.preventDefault();
+            } else if (event.key === ' ') {
+                event.preventDefault();
+                this.triggerAdvancedStrike();
+                return;
             }
 
             if (targetId !== null && this.ballSelect) {
@@ -602,6 +634,10 @@ export class SimulationApp {
         if (gl.state === GameState.BALL_IN_HAND) return;
         if (!cueBall || !cueBall.isSleeping || cueBall.isPocketted) return;
         if (this.cueManager.isStrikingAnimation) return;
+
+        // FIX: انتظر حتى تتوقف جميع الكرات — ليس فقط الكرة البيضاء
+        const allSleeping = this.physicsWorld.balls.every(b => b.isSleeping || b.isPocketted);
+        if (!allSleeping) return;
 
         // إخبار منطق اللعبة ببداية ضربة جديدة
         gl.onShotStart();
@@ -646,7 +682,15 @@ export class SimulationApp {
                 this.shotLaunched = true;
             }
             if (this.shotLaunched) {
-                if (totalKE < 0.000005) {
+                // FIX: كان الكود يعتمد على KE < 0.000005 كمؤشر لانتهاء الضربة،
+                // لكن كرة تتدحرج ببطء نحو الحفرة تملك KE أقل من الحد دون أن تكون
+                // توقفت، فيُستدعى onShotComplete قبل تسجيل الكرة المُهربة وتظل
+                // المجموعات غير محددة. الحل: الاعتماد على isSleeping/isPocketted
+                // الفعلية التي لا تتحقق إلا بعد انتهاء الحركة أو دخول الحفرة تماماً.
+                const allDone = this.physicsWorld.balls.every(
+                    b => b.isSleeping || b.isPocketted
+                );
+                if (allDone) {
                     this.shotSettleTimer += frameTime;
                     if (this.shotSettleTimer >= this.SETTLE_DELAY) {
                         this.onShotComplete();
@@ -675,7 +719,13 @@ export class SimulationApp {
         // ── تحديث mesh positions ──
         for (let item of this.ballMeshes) {
             item.mesh.position.copy(item.physics.position);
-            item.mesh.visible = !item.physics.isPocketted;
+            // FIX: أخفِ الكرة البيضاء الأصلية في وضع الكرة باليد — سواء كانت
+            // مُهربة أم لا — لمنع ظهور كرتين بيضاء في نفس الوقت
+            if (item.physics.id === 0 && this.gameLogic.state === GameState.BALL_IN_HAND) {
+                item.mesh.visible = false;
+            } else {
+                item.mesh.visible = !item.physics.isPocketted;
+            }
 
             if (!item.physics.isSleeping && !item.physics.isPocketted) {
                 const dRot = item.physics.angularVelocity.clone().multiplyScalar(this.fixedTimeStep);
