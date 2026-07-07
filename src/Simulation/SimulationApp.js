@@ -5,6 +5,7 @@ import { PhysicalBall } from '/src/Physic/PhysicalBall.js';
 import { WindBlowForce, MagneticCueBallForce } from '/src/IExternalForce.js';
 import { TableGraphics } from '/src/Simulation/TableGraphics.js';
 import { CueStickManager } from '/src/Simulation/CueStickManager.js';
+import { RoomEnvironment } from '/src/Simulation/RoomEnvironment.js';
 import { GameLogic, GameState, BallGroup } from '/src/GameLogic.js';
 
 export class SimulationApp {
@@ -15,7 +16,6 @@ export class SimulationApp {
         this.onPointerMove  = this.onPointerMove.bind(this);
         this.onPointerUp    = this.onPointerUp.bind(this);
 
-        // فيزياء
         this.physicsWorld   = new PhysicsWorld();
         this.ballMeshes     = [];
         this.tableWidth     = 1.27;
@@ -26,11 +26,9 @@ export class SimulationApp {
         this.accumulator    = 0;
         this.lastTime       = 0;
 
-        // منطق اللعبة
         this.gameLogic      = new GameLogic();
-        this.allPocketedIds = [];   // الكرات المُهربة تراكمياً (بدون الكرة البيضاء)
+        this.allPocketedIds = [];
 
-        // تتبع نهاية الضربة
         this.shotLaunched      = false;
         this.shotSettleTimer   = 0;
         this.SETTLE_DELAY      = 0.4;   // ثانية انتظار بعد سكون الكرات
@@ -47,6 +45,7 @@ export class SimulationApp {
         this.physicsWorld.registerExternalForce(new MagneticCueBallForce());
 
         this.tableGraphics = new TableGraphics(this);
+        new RoomEnvironment(this.tableGraphics.scene);
         this.cueManager    = new CueStickManager(this, this.tableGraphics.scene);
 
         this.initPhysicsWorld();
@@ -63,13 +62,9 @@ export class SimulationApp {
         window.requestAnimationFrame(this.animate);
     }
 
-    /* ═══════════════════════════════════════════════════
-       تهيئة الكرات والمشهد
-       ═══════════════════════════════════════════════════ */
     initPhysicsWorld() {
         const ballGeo = new THREE.SphereGeometry(this.ballRadius, 32, 32);
 
-        // الكرة البيضاء
         const cueBallPhys = new PhysicalBall(0, new THREE.Vector3(0, this.ballRadius, this.tableLength / 4), this.ballRadius, this.ballMass);
         const cueBallMesh = new THREE.Mesh(ballGeo, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1 }));
         cueBallMesh.castShadow = true;
@@ -136,22 +131,17 @@ export class SimulationApp {
     }
 
     initGameCallbacks() {
-        // تهريب كرة
         this.physicsWorld.onBallPocketed = (id) => {
             if (id !== 0 && !this.allPocketedIds.includes(id)) {
                 this.allPocketedIds.push(id);
             }
             this.gameLogic.onBallPocketed(id);
         };
-        // أول تلامس للكرة البيضاء
         this.physicsWorld.onCueBallFirstContact = (id) => {
             this.gameLogic.onFirstContact(id);
         };
     }
 
-    /* ═══════════════════════════════════════════════════
-       كرة شبح للوضع باليد
-       ═══════════════════════════════════════════════════ */
     initBallInHandGhost() {
         const geo = new THREE.SphereGeometry(this.ballRadius, 32, 32);
         const mat = new THREE.MeshStandardMaterial({
@@ -164,7 +154,6 @@ export class SimulationApp {
         this.ballInHandGhost.visible = false;
         this.tableGraphics.scene.add(this.ballInHandGhost);
 
-        // خط إرشادي متقطع حول منطقة المطبخ (خط الرأس)
         const headStringPoints = [
             new THREE.Vector3(-0.635, 0.002, 0),
             new THREE.Vector3( 0.635, 0.002, 0)
@@ -177,9 +166,6 @@ export class SimulationApp {
         this.tableGraphics.scene.add(this.headStringLine);
     }
 
-    /* ═══════════════════════════════════════════════════
-       واجهة اللعبة (Game HUD)
-       ═══════════════════════════════════════════════════ */
     initGameUI() {
         const hud = document.createElement('div');
         hud.id = 'game-hud';
@@ -194,7 +180,6 @@ export class SimulationApp {
         `;
 
         hud.innerHTML = `
-            <!-- اللاعب 1 -->
             <div id="hud-p1" style="
                 flex: 1; padding: 10px 16px; border-right: 1px solid #1e3a5f;
                 display: flex; flex-direction: column; justify-content: center; gap: 4px;">
@@ -204,7 +189,6 @@ export class SimulationApp {
                 <div id="hud-p1-remaining" style="font-size:11px; color:#64748b;"></div>
             </div>
 
-            <!-- المنتصف -->
             <div style="
                 flex: 2; display: flex; flex-direction: column;
                 align-items: center; justify-content: center; gap: 6px; padding: 8px;">
@@ -224,7 +208,6 @@ export class SimulationApp {
                 </div>
             </div>
 
-            <!-- اللاعب 2 -->
             <div id="hud-p2" style="
                 flex: 1; padding: 10px 16px; border-left: 1px solid #1e3a5f;
                 display: flex; flex-direction: column; justify-content: center; gap: 4px; text-align: right;">
@@ -237,7 +220,6 @@ export class SimulationApp {
 
         document.body.appendChild(hud);
 
-        // مرجع سريع للـ DOM
         this.hudEl = {
             p1:          document.getElementById('hud-p1'),
             p2:          document.getElementById('hud-p2'),
@@ -261,7 +243,6 @@ export class SimulationApp {
         const hud = this.hudEl;
         if (!hud) return;
 
-        // شارة الحالة
         const stateLabels = {
             [GameState.BREAK]:        { label: 'BREAK',       bg: '#1e3a5f', color: '#7dd3fc' },
             [GameState.PLAYING]:      { label: 'PLAYING',     bg: '#14532d', color: '#86efac' },
@@ -273,7 +254,6 @@ export class SimulationApp {
         hud.stateBadge.style.background   = stateInfo.bg;
         hud.stateBadge.style.color        = stateInfo.color;
 
-        // دور من؟
         if (gl.state === GameState.GAME_OVER) {
             hud.turn.textContent = gl.winner ? `🏆 اللاعب ${gl.winner} فاز!` : 'انتهت اللعبة';
             hud.turn.style.color = '#fbbf24';
@@ -285,13 +265,10 @@ export class SimulationApp {
             hud.turn.style.color = '#f8fafc';
         }
 
-        // رسالة الحدث
         hud.message.textContent = gl.eventMessage;
 
-        // تلميح وضع الكرة
         hud.bihHint.style.display = gl.state === GameState.BALL_IN_HAND ? 'block' : 'none';
 
-        // تمييز اللاعب النشط
         hud.p1.style.background = gl.currentPlayer === 1 && gl.state !== GameState.GAME_OVER
             ? 'rgba(56,189,248,0.07)' : 'transparent';
         hud.p2.style.background = gl.currentPlayer === 2 && gl.state !== GameState.GAME_OVER
@@ -301,7 +278,6 @@ export class SimulationApp {
         hud.p2.style.borderLeft  = gl.currentPlayer === 2 && gl.state !== GameState.GAME_OVER
             ? '3px solid #38bdf8' : '1px solid #1e3a5f';
 
-        // مجموعات اللاعبين
         const groupLabels = {
             [BallGroup.NONE]:    { text: '— (غير محددة)', color: '#64748b' },
             [BallGroup.SOLIDS]:  { text: '🔵 مصمتة 1–7',  color: '#60a5fa' },
@@ -312,11 +288,9 @@ export class SimulationApp {
         hud.p1Group.textContent = g1.text; hud.p1Group.style.color = g1.color;
         hud.p2Group.textContent = g2.text; hud.p2Group.style.color = g2.color;
 
-        // عداد الكرات المتبقية
         this._updateBallIndicators(1);
         this._updateBallIndicators(2);
 
-        // خط الرأس: ظاهر فقط في وضع الكرة باليد + قيد خلف الخط
         this.headStringLine.visible = gl.state === GameState.BALL_IN_HAND;
     }
 
@@ -335,12 +309,10 @@ export class SimulationApp {
         const remaining = ids.filter(id => !this.allPocketedIds.includes(id));
         const pocketed  = ids.filter(id =>  this.allPocketedIds.includes(id));
 
-        // FIX: كانت textContent تعرض وسوم HTML كنص خام — innerHTML يفسّرها صحيحاً
         hud[`p${player}Balls`].innerHTML =
             remaining.map(() => '●').join('') +
             '<span style="opacity:.3">' + pocketed.map(() => '●').join('') + '</span>';
 
-        // هل انتهى من مجموعته؟ أظهر مؤشر الكرة 8
         const eightPocketed = this.allPocketedIds.includes(8);
         if (remaining.length === 0 && !eightPocketed) {
             hud[`p${player}Remaining`].textContent = '🎯 الآن هرّب الكرة 8!';
@@ -351,9 +323,6 @@ export class SimulationApp {
         }
     }
 
-    /* ═══════════════════════════════════════════════════
-       نهاية الضربة — تقييم اللعبة
-       ═══════════════════════════════════════════════════ */
     onShotComplete() {
         const result = this.gameLogic.onShotEnd(this.allPocketedIds);
         if (!result) return;
@@ -362,14 +331,11 @@ export class SimulationApp {
             this.cueManager.cuePivot.visible = false;
             this.cueManager.aimLine.visible  = false;
 
-            // تأثير بصري للفوز: لون الخلفية لحظياً
             this.tableGraphics.renderer.domElement.style.outline = '4px solid #fbbf24';
         }
 
         if (result.ballInHand) {
-            // أظهر الشبح وفعّل وضع الكرة باليد
             this.ballInHandGhost.visible = true;
-            // ضع الشبح في موقع ابتدائي في منتصف الطاولة
             const startZ = result.behindLine ? this.tableLength / 4 * 0.5 : 0;
             this.ballInHandGhost.position.set(0, this.ballRadius, startZ);
             this.ballInHandPos.set(0, this.ballRadius, startZ);
@@ -379,9 +345,6 @@ export class SimulationApp {
         this.updateGameUI();
     }
 
-    /* ═══════════════════════════════════════════════════
-       Telemetry (لوحة البيانات اللحظية — unchanged)
-       ═══════════════════════════════════════════════════ */
     initTelemetryDOM() {
         const panel = document.createElement('div');
         panel.id = 'physics-telemetry-panel';
@@ -432,9 +395,6 @@ export class SimulationApp {
         });
     }
 
-    /* ═══════════════════════════════════════════════════
-       Sprite الأرقام
-       ═══════════════════════════════════════════════════ */
     createFloatingNumberSprite(number) {
         const canvas = document.createElement('canvas');
         canvas.width = 128; canvas.height = 128;
@@ -452,9 +412,6 @@ export class SimulationApp {
         return sprite;
     }
 
-    /* ═══════════════════════════════════════════════════
-       GUI
-       ═══════════════════════════════════════════════════ */
     initGUI() {
          this.gui = new GUI({ title: '🕹️ لوحة هندسة القوانين الفيزيائية' });
     this.gui.domElement.style.top   = '10px';
@@ -496,33 +453,26 @@ export class SimulationApp {
         });
     }
 
-    /* ═══════════════════════════════════════════════════
-       أحداث المؤشر والكيبورد
-       ═══════════════════════════════════════════════════ */
     initControlsInteraction() {
         window.addEventListener('pointerdown', this.onPointerDown);
         window.addEventListener('pointermove', this.onPointerMove);
         window.addEventListener('pointerup',   this.onPointerUp);
         window.addEventListener('resize',      this.onWindowResize);
-        // منع قائمة السياق عند زر الأيمن للتصويب
         window.addEventListener('contextmenu', e => e.preventDefault());
     }
 
     onPointerDown(e) {
-        // ── وضع الكرة باليد: زر أيسر على الطاولة ──
         if (this.gameLogic.state === GameState.BALL_IN_HAND && e.button === 0) {
             this._placeCueBallAtGhost(this.gameLogic.playerGroups);
             return;
         }
 
-        // ── التصويب: زر أيمن أو Shift ──
         const cueBall    = this.ballMeshes[0].physics;
         const stopCamera = this.cueManager.handlePointerDown(e, cueBall);
         if (stopCamera) this.tableGraphics.controls.enabled = false;
     }
 
     onPointerMove(e) {
-        // تحديث الكرة الشبح في وضع الكرة باليد
         if (this.gameLogic.state === GameState.BALL_IN_HAND && this.ballInHandGhost) {
             this._updateGhostPosition(e);
         }
@@ -547,15 +497,13 @@ export class SimulationApp {
         target.x = Math.max(b.minX + r, Math.min(b.maxX - r, target.x));
         target.z = Math.max(b.minZ + r, Math.min(b.maxZ - r, target.z));
 
-        // قيد "المطبخ" (خلف خط الرأس) عند الكسر
         if (this.headStringLine.visible) {
-            target.z = Math.max(r, target.z);   // يجب أن يكون z > 0
+            target.z = Math.max(r, target.z);
         }
 
         this.ballInHandGhost.position.set(target.x, this.ballRadius, target.z);
         this.ballInHandPos.copy(this.ballInHandGhost.position);
 
-        // FIX: تلوين الشبح أحمر عند موضع ممنوع (داخل حفرة أو فوق كرة)
         this.ballInHandPlacementValid = this._isValidPlacement(target);
         this.ballInHandGhost.material.color.setHex(
             this.ballInHandPlacementValid ? 0xffffff : 0xff3333
@@ -563,7 +511,6 @@ export class SimulationApp {
     }
 
     _placeCueBallAtGhost() {
-        // FIX: رفض الوضع إذا كانت النقطة داخل حفرة أو فوق كرة أخرى
         if (!this.ballInHandPlacementValid) return;
         const cueBall = this.ballMeshes[0].physics;
         cueBall.position.copy(this.ballInHandPos);
@@ -580,7 +527,6 @@ export class SimulationApp {
         this.updateGameUI();
     }
 
-    /** يتحقق أن الموضع المقترح ليس داخل حفرة وليس فوق كرة أخرى */
     _isValidPlacement(pos) {
         const r = this.ballRadius;
         for (const pocket of this.physicsWorld.pockets) {
@@ -631,27 +577,19 @@ export class SimulationApp {
         });
     }
 
-    /* ═══════════════════════════════════════════════════
-       ضربة العصا
-       ═══════════════════════════════════════════════════ */
     triggerAdvancedStrike() {
         const gl      = this.gameLogic;
         const cueBall = this.ballMeshes[0].physics;
 
-        // لا تُطلق إذا اللعبة منتهية أو في وضع الكرة باليد أو الكرة متحركة
         if (gl.state === GameState.GAME_OVER)    return;
         if (gl.state === GameState.BALL_IN_HAND) return;
         if (!cueBall || !cueBall.isSleeping || cueBall.isPocketted) return;
         if (this.cueManager.isStrikingAnimation) return;
-        // FIX: منع الضرب خلال نافذة التقييم (settle delay)
-        // shotLaunched يبقى true حتى يُستدعى onShotComplete
         if (this.shotLaunched) return;
-        // FIX: منع الضرب إذا لم تُقيَّم الضربة السابقة بعد
         if (this.gameLogic.shotInProgress) return;
         const allSleeping = this.physicsWorld.balls.every(b => b.isSleeping || b.isPocketted);
         if (!allSleeping) return;
 
-        // إخبار منطق اللعبة ببداية ضربة جديدة
         gl.onShotStart();
         this.shotLaunched    = false;
         this.shotSettleTimer = 0;
@@ -662,15 +600,11 @@ export class SimulationApp {
     }
 
     resetGame() {
-        // إعادة تحميل الصفحة لإعادة ضبط كل شيء
         window.location.reload();
     }
 
     onWindowResize() { this.tableGraphics.handleResize(); }
 
-    /* ═══════════════════════════════════════════════════
-       حلقة الرسوم المتحركة
-       ═══════════════════════════════════════════════════ */
     animate(timestamp) {
         window.requestAnimationFrame(this.animate);
 
@@ -688,7 +622,6 @@ export class SimulationApp {
         const cueBall  = this.ballMeshes[0].physics;
         const totalKE  = this.physicsWorld.getTotalKineticEnergy();
 
-        // ── تتبع نهاية الضربة ──
         if (this.gameLogic.shotInProgress) {
             if (!this.shotLaunched && totalKE > 0.0001) {
                 this.shotLaunched   = true;
@@ -737,12 +670,9 @@ export class SimulationApp {
             b => b.isSleeping || b.isPocketted
         );
 
-        // ── تحريك العصا ──
         if (this.cueManager.isStrikingAnimation) {
             this.cueManager.animateStrike(frameTime, cueBall);
         } else {
-            // FIX: كانت العصا تظهر فور سكون الكرة البيضاء حتى لو كانت
-            // كرات أخرى لا تزال تتحرك — الآن تظهر فقط عند توقف الجميع
             const canAim = this.gameLogic.state !== GameState.GAME_OVER
                         && this.gameLogic.state !== GameState.BALL_IN_HAND
                         && allBallsStopped
@@ -755,11 +685,8 @@ export class SimulationApp {
             }
         }
 
-        // ── تحديث mesh positions ──
         for (let item of this.ballMeshes) {
             item.mesh.position.copy(item.physics.position);
-            // FIX: أخفِ الكرة البيضاء الأصلية في وضع الكرة باليد — سواء كانت
-            // مُهربة أم لا — لمنع ظهور كرتين بيضاء في نفس الوقت
             if (item.physics.id === 0 && this.gameLogic.state === GameState.BALL_IN_HAND) {
                 item.mesh.visible = false;
             } else {
@@ -782,9 +709,6 @@ export class SimulationApp {
         this.tableGraphics.renderer.render(this.tableGraphics.scene, this.tableGraphics.camera);
     }
 
-    /* ═══════════════════════════════════════════════════
-       Telemetry UI
-       ═══════════════════════════════════════════════════ */
     updateTelemetryUI() {
         const totalEnergy = this.physicsWorld.getTotalKineticEnergy();
         if (this.domETotal) this.domETotal.innerText = `${totalEnergy.toFixed(5)} J`;
@@ -809,8 +733,6 @@ export class SimulationApp {
 
         if (this.domVc) {
             this.domVc.innerText   = `${vcMag.toFixed(4)} m/s`;
-            // FIX: العتبة كانت 0.005 بينما الفيزياء تستخدم 0.0185 كحد الانزلاق،
-            // مما يجعل vc يظهر أحمر بينما Phase يقول PURE ROLLING — تناقض بصري
             this.domVc.style.color = vcMag > 0.0185 ? '#f43f5e' : '#10b981';
         }
         if (this.domPhase) {

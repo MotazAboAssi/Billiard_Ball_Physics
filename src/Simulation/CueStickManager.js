@@ -19,14 +19,37 @@ export class CueStickManager {
         this.cuePivot = new THREE.Group();
         this.scene.add(this.cuePivot);
 
-        const cueLength = 1.0;
-        const cueGeo = new THREE.CylinderGeometry(0.012, 0.004, cueLength, 16);
-        cueGeo.translate(0, cueLength / 2, 0);
-
-        const cueMat = new THREE.MeshStandardMaterial({ color: 0xd2b48c, roughness: 0.4 });
-        this.cueMesh = new THREE.Mesh(cueGeo, cueMat);
+        this.cueMesh = new THREE.Group();
         this.cueMesh.rotation.x = Math.PI / 2;
         this.cuePivot.add(this.cueMesh);
+
+        const segs = [
+            [0.0040, 0.0043, 0.013, 0.0065, 0x1a6bbf, 0.25, 0.0 ],  
+            [0.0043, 0.0048, 0.022, 0.033,  0xeeeeee, 0.15, 0.05],  
+            [0.0048, 0.0092, 0.580, 0.335,  0xf0d898, 0.30, 0.0 ],  
+            [0.0092, 0.0105, 0.200, 0.725,  0x1e1208, 0.80, 0.0 ],  
+            [0.0105, 0.0130, 0.185, 0.918,  0x4a2008, 0.45, 0.05],  
+        ];
+
+        segs.forEach(([rT, rB, len, cy, col, rough, metal]) => {
+            const geo = new THREE.CylinderGeometry(rT, rB, len, 16);
+            geo.translate(0, cy, 0);
+            this.cueMesh.add(new THREE.Mesh(geo,
+                new THREE.MeshStandardMaterial({ color: col, roughness: rough, metalness: metal })
+            ));
+        });
+
+        const ring = new THREE.CylinderGeometry(0.0115, 0.0115, 0.014, 16);
+        ring.translate(0, 0.618, 0);
+        this.cueMesh.add(new THREE.Mesh(ring,
+            new THREE.MeshStandardMaterial({ color: 0xb8860b, roughness: 0.15, metalness: 0.95 })
+        ));
+
+        const cap = new THREE.CylinderGeometry(0.013, 0.013, 0.012, 16);
+        cap.translate(0, 1.017, 0);
+        this.cueMesh.add(new THREE.Mesh(cap,
+            new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.2, metalness: 0.9 })
+        ));
     }
 
     initAimLine() {
@@ -88,19 +111,16 @@ export class CueStickManager {
         this.strikeProgress += frameTime * 4;
 
         if (this.strikeProgress < 0.5) {
-            // مرحلة السحب للخلف
             const t = this.strikeProgress / 0.5;
             const offset = THREE.MathUtils.lerp(0.02, 0.15, t);
             this.cueMesh.position.set(0, 0, this.ctx.ballRadius + offset);
 
         } else if (this.strikeProgress < 0.6) {
-            // مرحلة الاندفاع للأمام
             const t = (this.strikeProgress - 0.5) / 0.1;
             const offset = THREE.MathUtils.lerp(0.15, 0.0, t);
             this.cueMesh.position.set(0, 0, this.ctx.ballRadius + offset);
 
         } else {
-            // لحظة الاصطدام الفعلي
             this.isStrikingAnimation = false;
             this.cueMesh.visible = false;
 

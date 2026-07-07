@@ -6,7 +6,6 @@ export class PhysicsWorld {
         this.balls = [];
         this.registeredForces = [];
 
-        // FIX: removed duplicate semicolon (was `};;`)
         this.config = {
             gravity: 9.81,
             mu_sliding: 0.15,
@@ -21,15 +20,12 @@ export class PhysicsWorld {
             strikeOffsetY: 0.0
         };
 
-        // Callbacks — يُعيِّنهما SimulationApp لتتبع اللعبة
-        this.onBallPocketed        = null;  // (ballId) — عند تهريب أي كرة
-        this.onCueBallFirstContact = null;  // (otherId) — أول تلامس للكرة البيضاء
+        this.onBallPocketed        = null;
+        this.onCueBallFirstContact = null;
 
         this.tableBounds = { minX: -0.635, maxX: 0.635, minZ: -1.27, maxZ: 1.27 };
 
         this.pocketRadius = 0.057;
-        // FIX: الحفر الزاوية كانت عند حافة الطاولة تماماً مما يجعل الكرة ترتد
-        // بالحائط قبل أن تصل إليها — إزاحتها قليلاً للداخل يصحح الـ hitbox
         this.pockets = [
             new THREE.Vector3(-0.618, 0, -1.252), new THREE.Vector3(0.618, 0, -1.252),
             new THREE.Vector3(-0.638, 0,  0),     new THREE.Vector3(0.638, 0,  0),
@@ -63,13 +59,11 @@ export class PhysicsWorld {
     }
 
     update(dt) {
-        // تطبيق الاحتكاك على كل كرة
         for (let ball of this.balls) {
             if (ball.isPocketted) continue;
             ball.applyStandardFriction(this.config, dt);
         }
 
-        // FIX: القوى الخارجية المسجلة كانت لا تُطبَّق أبداً — تم إضافة الحلقة هنا
         for (let force of this.registeredForces) {
             if (!force.enabled) continue;
             for (let ball of this.balls) {
@@ -79,8 +73,6 @@ export class PhysicsWorld {
             }
         }
 
-        // FIX: الحفر أولاً — كانت resolveCushionCollisions تُطبَّق قبل checkPocketCollisions
-        // فتُرتد الكرة عن الحائط قبل أن تُكتشف الحفرة في الزوايا
         this.checkPocketCollisions();
         this.resolveBallCollisions();
         this.resolveCushionCollisions();
@@ -123,17 +115,8 @@ export class PhysicsWorld {
                     b1.isSleeping = false;
                     b2.isSleeping = false;
 
-                    // إشعار اللعبة بأول تلامس للكرة البيضاء
-                    // FIX: لا تُسجِّل التلامس إلا إذا كانت الكرة البيضاء تتحرك
-                    // فعلاً — خلال أنيميشن الضربة (0.5 ث) تبقى الكرة ساكنة وقد
-                    // تُدفع كرة أخرى بجاذبية الحفرة نحوها فتُسبِّب تلامساً وهمياً
                     if (this.onCueBallFirstContact) {
                         const cueBallRef = b1.id === 0 ? b1 : (b2.id === 0 ? b2 : null);
-                        // FIX: العتبة كانت 0.15 m/s لمنع تلامس وهمي خلال أنيميشن الضربة،
-                        // لكنها تحجب أيضاً الضربات البطيئة (مثلاً بعد ارتداد عدة مرات)
-                        // فيصبح firstContactId=null وتُطلق مخالفة "لم تُلمس أي كرة" خطأً.
-                        // جاذبية الحفرة تولّد ~0.17 m/s — العتبة 0.03 أدنى منها بكثير
-                        // لكن كافية لتصفية أي اهتزاز في الفيزياء عند الكرة الساكنة.
                         if (cueBallRef && cueBallRef.velocity.length() > 0.03) {
                             if (b1.id === 0) this.onCueBallFirstContact(b2.id);
                             else if (b2.id === 0) this.onCueBallFirstContact(b1.id);
@@ -151,8 +134,6 @@ export class PhysicsWorld {
         for (let ball of this.balls) {
             if (ball.isSleeping || ball.isPocketted) continue;
 
-            // FIX: لا ترتد الكرة عن الحائط إذا كانت قريبة من حفرة
-            // وإلا ستُعيق الحفر الزاوية عن التقاط الكرات المارة عليها
             const nearPocket = this.pockets.some(p => {
                 const dx = p.x - ball.position.x;
                 const dz = p.z - ball.position.z;
@@ -192,10 +173,6 @@ export class PhysicsWorld {
         const vn_out = -e_c * vn;
         let vt_out = vt.clone().multiplyScalar(1 - mu_c);
 
-        // FIX: دوران التدحرج (x, z) كان متروكاً متطابقاً مع اتجاه الحركة قبل
-        // الارتطام، فيتعارض مع اتجاه السرعة الجديد بعد الارتداد ويُبقي الكرة في
-        // طور انزلاق طويل وهمي. الجدار يُخمد جزءاً من هذا الدوران أيضاً أثناء
-        // التصادم الانضغاطي السريع، تماماً كما يُخمد السرعة المماسية أعلاه
         ball.angularVelocity.x *= (1 - mu_c);
         ball.angularVelocity.z *= (1 - mu_c);
 
