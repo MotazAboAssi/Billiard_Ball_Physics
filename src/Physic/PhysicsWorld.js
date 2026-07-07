@@ -16,7 +16,7 @@ export class PhysicsWorld {
             e_cushion: 0.75,
             cushion_friction: 0.2,
             sleepThreshold: 0.00005,
-            strikeImpulse: 0.6,
+            strikeImpulse: 0.9,
             strikeOffsetX: 0.0,
             strikeOffsetY: 0.0
         };
@@ -27,7 +27,7 @@ export class PhysicsWorld {
 
         this.tableBounds = { minX: -0.635, maxX: 0.635, minZ: -1.27, maxZ: 1.27 };
 
-        this.pocketRadius = 0.047;
+        this.pocketRadius = 0.057;
         // FIX: الحفر الزاوية كانت عند حافة الطاولة تماماً مما يجعل الكرة ترتد
         // بالحائط قبل أن تصل إليها — إزاحتها قليلاً للداخل يصحح الـ hitbox
         this.pockets = [
@@ -124,9 +124,20 @@ export class PhysicsWorld {
                     b2.isSleeping = false;
 
                     // إشعار اللعبة بأول تلامس للكرة البيضاء
+                    // FIX: لا تُسجِّل التلامس إلا إذا كانت الكرة البيضاء تتحرك
+                    // فعلاً — خلال أنيميشن الضربة (0.5 ث) تبقى الكرة ساكنة وقد
+                    // تُدفع كرة أخرى بجاذبية الحفرة نحوها فتُسبِّب تلامساً وهمياً
                     if (this.onCueBallFirstContact) {
-                        if (b1.id === 0) this.onCueBallFirstContact(b2.id);
-                        else if (b2.id === 0) this.onCueBallFirstContact(b1.id);
+                        const cueBallRef = b1.id === 0 ? b1 : (b2.id === 0 ? b2 : null);
+                        // FIX: العتبة كانت 0.15 m/s لمنع تلامس وهمي خلال أنيميشن الضربة،
+                        // لكنها تحجب أيضاً الضربات البطيئة (مثلاً بعد ارتداد عدة مرات)
+                        // فيصبح firstContactId=null وتُطلق مخالفة "لم تُلمس أي كرة" خطأً.
+                        // جاذبية الحفرة تولّد ~0.17 m/s — العتبة 0.03 أدنى منها بكثير
+                        // لكن كافية لتصفية أي اهتزاز في الفيزياء عند الكرة الساكنة.
+                        if (cueBallRef && cueBallRef.velocity.length() > 0.03) {
+                            if (b1.id === 0) this.onCueBallFirstContact(b2.id);
+                            else if (b2.id === 0) this.onCueBallFirstContact(b1.id);
+                        }
                     }
                 }
             }

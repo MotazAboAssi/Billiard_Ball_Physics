@@ -174,8 +174,11 @@ export class GameLogic {
             }
         }
 
-        // — مخالفة: لم تُلمس أي كرة —
-        if (this.firstContactId === null && myGroup !== BallGroup.NONE) {
+        // — مخالفة: لم تُلمس أي كرة ولم تُهرَّب أي كرة —
+        // FIX: كان الشرط firstContactId===null يكفي وحده للمخالفة، ما يعني:
+        // إذا دخلت كرة صحيحة (تهريب مباشر) لكن firstContactId=null (لأي سبب)
+        // كانت المخالفة تُطلق خطأً. الآن: المخالفة فقط إذا لم يُهرَّب شيء أيضاً.
+        if (this.firstContactId === null && myGroup !== BallGroup.NONE && pocketed.length === 0) {
             result.nextPlayer = this._other();
             result.ballInHand = true;
             result.message    = `⚠️ مخالفة! لم تُلمس أي كرة. الكرة لـ اللاعب ${result.nextPlayer}`;
@@ -198,15 +201,13 @@ export class GameLogic {
         });
 
         if (wrongPocketed.length > 0) {
-            if (updatedGroup === BallGroup.NONE) {
-                // طاولة مفتوحة + نوعان في ضربة واحدة: ليست مخالفة، تبديل الدور فقط
-                result.nextPlayer = this._other();
-                result.message    = `🎯 طاولة مفتوحة — نوعان مُهربان. دور اللاعب ${result.nextPlayer}`;
-            } else {
-                result.nextPlayer = this._other();
-                result.ballInHand = true;
-                result.message    = `⚠️ مخالفة! تهريب كرة خاطئة. الكرة لـ اللاعب ${result.nextPlayer}`;
-            }
+            result.nextPlayer = this._other();
+            result.ballInHand = true;
+            // إظهار المجموعة المُعيَّنة في رسالة المخالفة
+            const groupInfo = updatedGroup !== BallGroup.NONE
+                ? ` | مجموعتك: ${this._groupLabel(updatedGroup)}`
+                : '';
+            result.message = `⚠️ مخالفة! تهريب كرة خاطئة${groupInfo}. الكرة لـ اللاعب ${result.nextPlayer}`;
 
         } else if (correctPocketed.length > 0) {
             result.nextPlayer = this.currentPlayer;
@@ -246,18 +247,23 @@ export class GameLogic {
 
     _tryAssignGroups(pocketedIds) {
         if (this.groupAssigned) return;
-        const hasSolid  = pocketedIds.some(id => id >= 1 && id <= 7);
-        const hasStripe = pocketedIds.some(id => id >= 9 && id <= 15);
-        if (hasSolid && !hasStripe) {
+        // FIX: عند تهريب نوعين في ضربة واحدة، كان التعيين يتجمّد (mixed → لا تعيين)
+        // الآن: المجموعة تُحدَّد بحسب أولى الكرات غير الـ8 التي دخلت الحفرة
+        const firstNonEight = pocketedIds.find(id => {
+            const g = this._groupOf(id);
+            return g === BallGroup.SOLIDS || g === BallGroup.STRIPES;
+        });
+        if (!firstNonEight) return;
+        const firstGroup = this._groupOf(firstNonEight);
+        if (firstGroup === BallGroup.SOLIDS) {
             this.playerGroups[this.currentPlayer] = BallGroup.SOLIDS;
             this.playerGroups[this._other()]      = BallGroup.STRIPES;
             this.groupAssigned = true;
-        } else if (hasStripe && !hasSolid) {
+        } else if (firstGroup === BallGroup.STRIPES) {
             this.playerGroups[this.currentPlayer] = BallGroup.STRIPES;
             this.playerGroups[this._other()]      = BallGroup.SOLIDS;
             this.groupAssigned = true;
         }
-        // إذا تهربت نوعان معاً في ضربة واحدة: لا تعيين حتى تُحسم
     }
 
     _hasRemaining(group, allPocketedIds) {

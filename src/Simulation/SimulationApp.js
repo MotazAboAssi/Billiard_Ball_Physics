@@ -634,8 +634,11 @@ export class SimulationApp {
         if (gl.state === GameState.BALL_IN_HAND) return;
         if (!cueBall || !cueBall.isSleeping || cueBall.isPocketted) return;
         if (this.cueManager.isStrikingAnimation) return;
-
-        // FIX: انتظر حتى تتوقف جميع الكرات — ليس فقط الكرة البيضاء
+        // FIX: منع الضرب خلال نافذة التقييم (settle delay)
+        // shotLaunched يبقى true حتى يُستدعى onShotComplete
+        if (this.shotLaunched) return;
+        // FIX: منع الضرب إذا لم تُقيَّم الضربة السابقة بعد
+        if (this.gameLogic.shotInProgress) return;
         const allSleeping = this.physicsWorld.balls.every(b => b.isSleeping || b.isPocketted);
         if (!allSleeping) return;
 
@@ -703,14 +706,23 @@ export class SimulationApp {
             }
         }
 
+        const allBallsStopped = this.physicsWorld.balls.every(
+            b => b.isSleeping || b.isPocketted
+        );
+
         // ── تحريك العصا ──
         if (this.cueManager.isStrikingAnimation) {
             this.cueManager.animateStrike(frameTime, cueBall);
         } else {
+            // FIX: كانت العصا تظهر فور سكون الكرة البيضاء حتى لو كانت
+            // كرات أخرى لا تزال تتحرك — الآن تظهر فقط عند توقف الجميع
             const canAim = this.gameLogic.state !== GameState.GAME_OVER
-                        && this.gameLogic.state !== GameState.BALL_IN_HAND;
-            if (canAim) this.cueManager.updateState(cueBall);
-            else {
+                        && this.gameLogic.state !== GameState.BALL_IN_HAND
+                        && allBallsStopped
+                        && !this.gameLogic.shotInProgress;
+            if (canAim) {
+                this.cueManager.updateState(cueBall);
+            } else {
                 this.cueManager.cuePivot.visible = false;
                 this.cueManager.aimLine.visible  = false;
             }
@@ -769,13 +781,15 @@ export class SimulationApp {
         const vcMag = new THREE.Vector3().addVectors(ball.velocity, vTang).length();
 
         if (this.domVc) {
-            this.domVc.innerText    = `${vcMag.toFixed(4)} m/s`;
-            this.domVc.style.color  = vcMag > 0.005 ? '#f43f5e' : '#10b981';
+            this.domVc.innerText   = `${vcMag.toFixed(4)} m/s`;
+            // FIX: العتبة كانت 0.005 بينما الفيزياء تستخدم 0.0185 كحد الانزلاق،
+            // مما يجعل vc يظهر أحمر بينما Phase يقول PURE ROLLING — تناقض بصري
+            this.domVc.style.color = vcMag > 0.0185 ? '#f43f5e' : '#10b981';
         }
         if (this.domPhase) {
-            if      (ball.isSleeping) { this.domPhase.innerText = 'STATIONARY'; this.domPhase.style.color = '#94a3b8'; }
-            else if (vcMag > 0.005)   { this.domPhase.innerText = 'SLIDING (طور الانزلاق)'; this.domPhase.style.color = '#f43f5e'; }
-            else                      { this.domPhase.innerText = 'PURE ROLLING (تدحرج نقي)'; this.domPhase.style.color = '#38bdf8'; }
+            if      (ball.isSleeping)   { this.domPhase.innerText = 'STATIONARY'; this.domPhase.style.color = '#94a3b8'; }
+            else if (vcMag > 0.0185)    { this.domPhase.innerText = 'SLIDING (طور الانزلاق)'; this.domPhase.style.color = '#f43f5e'; }
+            else                        { this.domPhase.innerText = 'PURE ROLLING (تدحرج نقي)'; this.domPhase.style.color = '#38bdf8'; }
         }
     }
 }
