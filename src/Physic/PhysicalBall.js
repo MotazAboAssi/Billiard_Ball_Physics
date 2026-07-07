@@ -141,19 +141,20 @@ export class PhysicalBall {
         // تحديث الموقع
         this.position.addScaledVector(this.velocity, dt);
 
-        // فحص عتبة السكون — لكن لا توقف الكرة إذا كانت قريبة من حفرة
+        // فحص عتبة السكون — لكن لا توقف الكرة إذا كانت داخل نطاق جاذبية الحفرة
         if (this.velocity.length() < 0.002 && this.angularVelocity.length() < 0.0355) {
-            // FIX: تحقق من قرب أي حفرة قبل إيقاف الكرة — كرة بطيئة بالقرب من
-            // الحفرة يجب أن تُترك لجاذبية الحفرة لتُكمل دخولها
-            const nearPocket = this.worldBallsRef && (() => {
-                // نصل للحفر من خلال worldBallsRef (مرجع عالم الفيزياء)
-                if (!this._pocketsRef) return false;
-                return this._pocketsRef.some(p => {
-                    const dx = p.x - this.position.x;
-                    const dz = p.z - this.position.z;
-                    return Math.sqrt(dx * dx + dz * dz) < this._pocketRadius * 2.2;
-                });
-            })();
+            // FIX: كان المضاعف 2.2 يُنشئ منطقة (0.071m → 0.1254m) لا تنام فيها
+            // الكرة ولا تصلها جاذبية الحفرة (تبدأ عند 0.071m) فتبقى معلّقة إلى
+            // الأبد وتمنع allDone من أن تصبح true → تجمُّد اللعبة.
+            // الحل: ضبط المنطقة لتتطابق مع عتبة الجاذبية الفعلية تماماً
+            const gravityThreshold = this._pocketRadius
+                ? this._pocketRadius + this.radius * 0.55  // يطابق checkPocketCollisions
+                : -1;
+            const nearPocket = this._pocketsRef && this._pocketsRef.some(p => {
+                const dx = p.x - this.position.x;
+                const dz = p.z - this.position.z;
+                return Math.sqrt(dx * dx + dz * dz) < gravityThreshold;
+            });
             if (!nearPocket) {
                 this.velocity.set(0, 0, 0);
                 this.angularVelocity.set(0, 0, 0);

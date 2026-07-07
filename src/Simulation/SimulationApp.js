@@ -682,23 +682,36 @@ export class SimulationApp {
         // ── تتبع نهاية الضربة ──
         if (this.gameLogic.shotInProgress) {
             if (!this.shotLaunched && totalKE > 0.0001) {
-                this.shotLaunched = true;
+                this.shotLaunched   = true;
+                this.shotActiveTime = 0;
             }
             if (this.shotLaunched) {
-                // FIX: كان الكود يعتمد على KE < 0.000005 كمؤشر لانتهاء الضربة،
-                // لكن كرة تتدحرج ببطء نحو الحفرة تملك KE أقل من الحد دون أن تكون
-                // توقفت، فيُستدعى onShotComplete قبل تسجيل الكرة المُهربة وتظل
-                // المجموعات غير محددة. الحل: الاعتماد على isSleeping/isPocketted
-                // الفعلية التي لا تتحقق إلا بعد انتهاء الحركة أو دخول الحفرة تماماً.
+                this.shotActiveTime = (this.shotActiveTime || 0) + frameTime;
+
                 const allDone = this.physicsWorld.balls.every(
                     b => b.isSleeping || b.isPocketted
                 );
-                if (allDone) {
+                // FIX: timeout 7 ثوانٍ كشبكة أمان ضد أي كرة عالقة لا تنام ولا تُهرَّب
+                // يمنع التجمُّد الأبدي بغض النظر عن سبب المشكلة
+                const timedOut = this.shotActiveTime > 7.0;
+
+                if (allDone || timedOut) {
+                    if (timedOut && !allDone) {
+                        // أجبر جميع الكرات على النوم قبل التقييم
+                        this.physicsWorld.balls.forEach(b => {
+                            if (!b.isPocketted) {
+                                b.velocity.set(0, 0, 0);
+                                b.angularVelocity.set(0, 0, 0);
+                                b.isSleeping = true;
+                            }
+                        });
+                    }
                     this.shotSettleTimer += frameTime;
                     if (this.shotSettleTimer >= this.SETTLE_DELAY) {
                         this.onShotComplete();
                         this.shotLaunched    = false;
                         this.shotSettleTimer = 0;
+                        this.shotActiveTime  = 0;
                     }
                 } else {
                     this.shotSettleTimer = 0;
