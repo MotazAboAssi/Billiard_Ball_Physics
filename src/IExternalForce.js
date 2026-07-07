@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 
-// الواجهة الأساسية لأي قانون فيزيائي خارجي
 export class IExternalForce {
     constructor(name) {
         this.name = name;
@@ -10,7 +9,6 @@ export class IExternalForce {
     setupGUI(folder) { }
 }
 
-// أ: قانون مقاومة الرياح الجانبية المتغيرة
 export class WindBlowForce extends IExternalForce {
     constructor() {
         super('الرياح الجانبية');
@@ -26,7 +24,6 @@ export class WindBlowForce extends IExternalForce {
     }
 }
 
-// ب: قانون الحقل المغناطيسي للكرة البيضاء
 export class MagneticCueBallForce extends IExternalForce {
     constructor() {
         super('الحقل المغناطيسي');

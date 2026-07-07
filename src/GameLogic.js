@@ -1,17 +1,15 @@
-// GameLogic.js — نظام قواعد لعبة البلياردو (8-Ball Pool)
-
 export const GameState = {
-    BREAK:        'BREAK',        // ضربة الكسر الأولى
-    PLAYING:      'PLAYING',      // دور طبيعي
-    BALL_IN_HAND: 'BALL_IN_HAND', // الكرة البيضاء باليد (بعد خدش)
-    GAME_OVER:    'GAME_OVER'     // انتهت اللعبة
+    BREAK:        'BREAK',
+    PLAYING:      'PLAYING',
+    BALL_IN_HAND: 'BALL_IN_HAND',
+    GAME_OVER:    'GAME_OVER'
 };
 
 export const BallGroup = {
     NONE:    'NONE',
-    SOLIDS:  'SOLIDS',   // 1–7  المصمتة
-    STRIPES: 'STRIPES',  // 9–15 المخططة
-    EIGHT:   'EIGHT'     // 8
+    SOLIDS:  'SOLIDS',
+    STRIPES: 'STRIPES',
+    EIGHT:   'EIGHT'
 };
 
 export class GameLogic {
@@ -27,17 +25,12 @@ export class GameLogic {
         this.winner        = null;
         this.eventMessage  = 'اللاعب 1 يبدأ بالكسر — اضغط "إطلاق القوة"';
 
-        // تتبع الضربة الجارية
         this.shotInProgress          = false;
         this.pocketedThisShot        = [];
         this.cueBallPocketedThisShot = false;
         this.firstContactId          = null;
         this.firstContactDone        = false;
     }
-
-    /* ═══════════════════════════════════════
-       واجهة تتبع الضربة — يستدعيها SimulationApp
-       ═══════════════════════════════════════ */
 
     onShotStart() {
         this.shotInProgress          = true;
@@ -47,7 +40,6 @@ export class GameLogic {
         this.firstContactDone        = false;
     }
 
-    /** تُستدعى من PhysicsWorld عند تهريب أي كرة */
     onBallPocketed(ballId) {
         if (!this.shotInProgress) return;
         if (ballId === 0) {
@@ -57,17 +49,12 @@ export class GameLogic {
         }
     }
 
-    /** تُستدعى من PhysicsWorld عند أول تلامس للكرة البيضاء */
     onFirstContact(otherId) {
         if (!this.shotInProgress || this.firstContactDone) return;
         this.firstContactId   = otherId;
         this.firstContactDone = true;
     }
 
-    /* ═══════════════════════════════════════
-       تقييم نهاية الضربة
-       @param allPocketedIds  — مصفوفة كل الكرات المُهربة في اللعبة حتى الآن
-       ═══════════════════════════════════════ */
     onShotEnd(allPocketedIds) {
         if (!this.shotInProgress) return null;
         this.shotInProgress = false;
@@ -78,13 +65,12 @@ export class GameLogic {
         let result = {
             nextPlayer: this.currentPlayer,
             ballInHand: false,
-            behindLine: false,   // قيد "المطبخ" بعد خدش الكسر
+            behindLine: false,
             gameOver:   false,
             winner:     null,
             message:    ''
         };
 
-        /* ─────────── ضربة الكسر ─────────── */
         if (this.state === GameState.BREAK) {
             if (scratch) {
                 result.nextPlayer = this._other();
@@ -93,14 +79,13 @@ export class GameLogic {
                 result.message = `💥 خدش في الكسر! الكرة لـ اللاعب ${result.nextPlayer} (خلف خط الرأس)`;
 
             } else if (pocketed.includes(8)) {
-                // الكرة 8 في الكسر → أعد وضع الكرة البيضاء للكاسر نفسه
                 result.nextPlayer = this.currentPlayer;
                 result.ballInHand = true;
                 result.message    = '🎱 تهربت الكرة 8 في الكسر! أعد وضع الكرة البيضاء';
 
             } else if (pocketed.length > 0) {
                 this._tryAssignGroups(pocketed);
-                result.nextPlayer = this.currentPlayer; // الكاسر يحتفظ بالدور
+                result.nextPlayer = this.currentPlayer;
                 result.message = `✅ كسر ناجح! اللاعب ${this.currentPlayer} → ${this._groupLabel(this.playerGroups[this.currentPlayer])}`;
 
             } else {
@@ -114,9 +99,6 @@ export class GameLogic {
             return result;
         }
 
-        /* ─────────── اللعب الطبيعي ─────────── */
-
-        // — تهريب الكرة 8 —
         if (pocketed.includes(8)) {
             const myGroup       = this.playerGroups[this.currentPlayer];
             const stillHasOwn   = this._hasRemaining(myGroup, allPocketedIds);
@@ -137,7 +119,6 @@ export class GameLogic {
             return result;
         }
 
-        // — خدش —
         if (scratch) {
             result.nextPlayer = this._other();
             result.ballInHand = true;
@@ -148,13 +129,7 @@ export class GameLogic {
             return result;
         }
 
-        // — مخالفة: لمس كرة خاطئة أولاً —
         const myGroup = this.playerGroups[this.currentPlayer];
-        // FIX: كان يستخدم allPocketedIds الكاملة (بعد الضربة) لتحديد هل الدور
-        // على الكرة 8، مما يُفسد الحكم عند تهريب آخر كرة في المجموعة:
-        // تُهرَّب الكرة → تُضاف لـ allPocketedIds → _hasRemaining يعيد false
-        // → onEightBall = true → لمس المجموعة أولاً يُعدّ مخالفة خطأً.
-        // الحل: استخدام حالة ما قبل الضربة لهذا الحكم فقط.
         const allPocketedBeforeShot = allPocketedIds.filter(id => !pocketed.includes(id));
         if (this.firstContactId !== null && myGroup !== BallGroup.NONE) {
             const contactGroup = this._groupOf(this.firstContactId);
@@ -174,10 +149,6 @@ export class GameLogic {
             }
         }
 
-        // — مخالفة: لم تُلمس أي كرة ولم تُهرَّب أي كرة —
-        // FIX: كان الشرط firstContactId===null يكفي وحده للمخالفة، ما يعني:
-        // إذا دخلت كرة صحيحة (تهريب مباشر) لكن firstContactId=null (لأي سبب)
-        // كانت المخالفة تُطلق خطأً. الآن: المخالفة فقط إذا لم يُهرَّب شيء أيضاً.
         if (this.firstContactId === null && myGroup !== BallGroup.NONE && pocketed.length === 0) {
             result.nextPlayer = this._other();
             result.ballInHand = true;
@@ -188,7 +159,6 @@ export class GameLogic {
             return result;
         }
 
-        // — تعيين المجموعات إن لزم —
         if (!this.groupAssigned && pocketed.filter(id => id !== 8).length > 0) {
             this._tryAssignGroups(pocketed);
         }
@@ -203,7 +173,6 @@ export class GameLogic {
         if (wrongPocketed.length > 0) {
             result.nextPlayer = this._other();
             result.ballInHand = true;
-            // إظهار المجموعة المُعيَّنة في رسالة المخالفة
             const groupInfo = updatedGroup !== BallGroup.NONE
                 ? ` | مجموعتك: ${this._groupLabel(updatedGroup)}`
                 : '';
@@ -224,10 +193,6 @@ export class GameLogic {
         return result;
     }
 
-    /* ═══════════════════════════════════════
-       مساعدات عامة
-       ═══════════════════════════════════════ */
-
     getRemainingCount(group, allPocketedIds) {
         if (group === BallGroup.SOLIDS)
             return [1,2,3,4,5,6,7].filter(id => !allPocketedIds.includes(id)).length;
@@ -247,8 +212,6 @@ export class GameLogic {
 
     _tryAssignGroups(pocketedIds) {
         if (this.groupAssigned) return;
-        // FIX: عند تهريب نوعين في ضربة واحدة، كان التعيين يتجمّد (mixed → لا تعيين)
-        // الآن: المجموعة تُحدَّد بحسب أولى الكرات غير الـ8 التي دخلت الحفرة
         const firstNonEight = pocketedIds.find(id => {
             const g = this._groupOf(id);
             return g === BallGroup.SOLIDS || g === BallGroup.STRIPES;
