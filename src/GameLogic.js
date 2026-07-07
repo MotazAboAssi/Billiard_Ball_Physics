@@ -96,14 +96,22 @@ export class GameLogic {
                 // الكرة 8 في الكسر → أعد وضع الكرة البيضاء للكاسر نفسه
                 result.nextPlayer = this.currentPlayer;
                 result.ballInHand = true;
-                result.message    = '🎱 تهربت الكرة 8 في الكسر! أعد وضع الكرة البيضاء';
+                result.message    = '🎱 تهربت الكرة 8 في الكسر! أعد وضع الكرة السوداء';
 
             } else if (pocketed.length > 0) {
                 this._tryAssignGroups(pocketed);
                 result.nextPlayer = this.currentPlayer; // الكاسر يحتفظ بالدور
                 result.message = `✅ كسر ناجح! اللاعب ${this.currentPlayer} → ${this._groupLabel(this.playerGroups[this.currentPlayer])}`;
 
-            } else {
+            } else if (this.firstContactId === null && pocketed.length === 0) {
+            result.nextPlayer = this._other();
+            result.ballInHand = true;
+            result.message    = `⚠️ لم تلمس الكرة اي كرة اخرى`;
+            this.currentPlayer = result.nextPlayer;
+            this.state         = GameState.BALL_IN_HAND;
+            this.eventMessage  = result.message;
+            return result;
+}else {
                 result.nextPlayer = this._other();
                 result.message = `🎯 كسر بلا نتيجة. دور اللاعب ${result.nextPlayer}`;
             }
@@ -115,7 +123,15 @@ export class GameLogic {
         }
 
         /* ─────────── اللعب الطبيعي ─────────── */
-
+        if (this.firstContactId === null && pocketed.length === 0) {
+            result.nextPlayer = this._other();
+            result.ballInHand = true;
+            result.message    = `⚠️ لم تلمس الكرة اي كرة اخرى`;
+            this.currentPlayer = result.nextPlayer;
+            this.state         = GameState.BALL_IN_HAND;
+            this.eventMessage  = result.message;
+            return result;
+}
         // — تهريب الكرة 8 —
         if (pocketed.includes(8)) {
             const myGroup       = this.playerGroups[this.currentPlayer];
@@ -156,6 +172,7 @@ export class GameLogic {
         // → onEightBall = true → لمس المجموعة أولاً يُعدّ مخالفة خطأً.
         // الحل: استخدام حالة ما قبل الضربة لهذا الحكم فقط.
         const allPocketedBeforeShot = allPocketedIds.filter(id => !pocketed.includes(id));
+
         if (this.firstContactId !== null && myGroup !== BallGroup.NONE) {
             const contactGroup = this._groupOf(this.firstContactId);
             const onEightBall  = !this._hasRemaining(myGroup, allPocketedBeforeShot);

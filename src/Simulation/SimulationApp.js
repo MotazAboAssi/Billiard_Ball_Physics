@@ -34,7 +34,7 @@ export class SimulationApp {
         this.shotLaunched      = false;
         this.shotSettleTimer   = 0;
         this.SETTLE_DELAY      = 0.4;   // ثانية انتظار بعد سكون الكرات
-
+        this.SHOT_TIMEOUT    = 20.0;  // ⏱️ المهلة القصوى للضربة (بالثواني) – جديدة
         // وضع الكرة باليد
         this.raycaster         = new THREE.Raycaster();
         this.mouse             = new THREE.Vector2();
@@ -456,18 +456,27 @@ export class SimulationApp {
        GUI
        ═══════════════════════════════════════════════════ */
     initGUI() {
-        this.gui = new GUI({ title: '🕹️ لوحة هندسة القوانين الفيزيائية' });
-        this.gui.domElement.style.top   = '10px';
-        this.gui.domElement.style.right = '10px';
-        const config = this.physicsWorld.config;
+         this.gui = new GUI({ title: '🕹️ لوحة هندسة القوانين الفيزيائية' });
+    this.gui.domElement.style.top   = '10px';
+    this.gui.domElement.style.right = '10px';
+    const config = this.physicsWorld.config;
 
-        const fStrike = this.gui.addFolder('🏑 التحكم بالعصا والضربة');
-        fStrike.add(config, 'strikeImpulse', 0.1, 3.0, 0.05).name('دفع الضربة (Impulse)').onChange(v => this.physicsWorld.updateParameters({ strikeImpulse: v }));
-        fStrike.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001).name('انحراف أفقي (X)').onChange(v => this.physicsWorld.updateParameters({ strikeOffsetX: v }));
-        fStrike.add(config, 'strikeOffsetY', -0.02, 0.02, 0.001).name('انحراف رأسي (Y)').onChange(v => this.physicsWorld.updateParameters({ strikeOffsetY: v }));
-        fStrike.add(this, 'triggerAdvancedStrike').name('🚀 إطلاق القوة');
-        fStrike.add(this, 'resetGame').name('🔄 إعادة اللعبة');
-        fStrike.open();
+    // ✅ تعريف المجلد (يجب ألا يكون معلقاً)
+    const fStrike = this.gui.addFolder('🏑 التحكم بالعصا والضربة');
+
+    // عناصر التحكم الموجودة
+    fStrike.add(config, 'strikeImpulse', 0.1, 3.0, 0.05).name('دفع الضربة (Impulse)');
+    fStrike.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001).name('انحراف أفقي (X)');
+    fStrike.add(config, 'strikeOffsetY', -0.02, 0.02, 0.001).name('انحراف رأسي (Y)');
+
+    // ✅ عنصر التحكم الجديد للمهلة
+    fStrike.add(this, 'SHOT_TIMEOUT', 1.0, 180.0, 0.5).name('⏳ مهلة الضربة (ثانية)');
+
+    // الأزرار
+    fStrike.add(this, 'triggerAdvancedStrike').name('🚀 إطلاق القوة');
+    fStrike.add(this, 'resetGame').name('🔄 إعادة اللعبة');
+
+    fStrike.open();  // يفتح المجلد تلقائياً
 
         const fEnv = this.gui.addFolder('🌍 البيئة والاحتكاك');
         fEnv.add(config, 'gravity',       0.0, 25.0,  0.1  ).name('الجاذبية (g)').onChange(v => this.physicsWorld.updateParameters({ gravity: v }));
@@ -693,10 +702,15 @@ export class SimulationApp {
                 );
                 // FIX: timeout 7 ثوانٍ كشبكة أمان ضد أي كرة عالقة لا تنام ولا تُهرَّب
                 // يمنع التجمُّد الأبدي بغض النظر عن سبب المشكلة
-                const timedOut = this.shotActiveTime > 7.0;
+                // const timedOut = this.shotActiveTime > 20.0;
+                const timedOut = this.shotActiveTime > this.SHOT_TIMEOUT;
 
-                if (allDone || timedOut) {
-                    if (timedOut && !allDone) {
+                if (allDone 
+                    || timedOut
+                ) {
+                    if (
+                        timedOut &&
+                         !allDone) {
                         // أجبر جميع الكرات على النوم قبل التقييم
                         this.physicsWorld.balls.forEach(b => {
                             if (!b.isPocketted) {
