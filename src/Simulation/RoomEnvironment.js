@@ -78,7 +78,6 @@ export class RoomEnvironment {
         this._wall(ROOM_D, ROOM_H, -ROOM_W / 2, WALL_Y, 0,  Math.PI / 2,  wallMat);
         this._wall(ROOM_D, ROOM_H,  ROOM_W / 2, WALL_Y, 0, -Math.PI / 2, wallMat);
 
-        // Ceiling
         const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_W, ROOM_D), ceilMat);
         ceil.rotation.x = Math.PI / 2;
         ceil.position.set(0, CEIL_Y, 0);

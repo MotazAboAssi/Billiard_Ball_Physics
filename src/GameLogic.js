@@ -107,7 +107,6 @@ export class GameLogic {
             return result;
         }
 
-        /* ─────────── اللعب الطبيعي ─────────── */
         if (this.firstContactId === null && pocketed.length === 0) {
             result.nextPlayer = this._other();
             result.ballInHand = true;
@@ -117,7 +116,6 @@ export class GameLogic {
             this.eventMessage  = result.message;
             return result;
 }
-        // — تهريب الكرة 8 —
         if (pocketed.includes(8)) {
             const myGroup       = this.playerGroups[this.currentPlayer];
             const stillHasOwn   = this._hasRemaining(myGroup, allPocketedIds);
