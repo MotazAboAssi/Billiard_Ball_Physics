@@ -139,7 +139,7 @@ export class TableGraphics {
     }
 
     _addTableMarkings(W, L) {
-        const Y = 0.002;   // just above cloth surface
+        const Y = 0.002;
         const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.18 });
         const spotMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.30 });
 

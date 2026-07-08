@@ -31,9 +31,8 @@ export class SimulationApp {
 
         this.shotLaunched      = false;
         this.shotSettleTimer   = 0;
-        this.SETTLE_DELAY      = 0.4;   // ثانية انتظار بعد سكون الكرات
-        this.SHOT_TIMEOUT    = 20.0;  // ⏱️ المهلة القصوى للضربة (بالثواني) – جديدة
-        // وضع الكرة باليد
+        this.SETTLE_DELAY      = 0.4;
+        this.SHOT_TIMEOUT    = 20.0;
         this.raycaster         = new THREE.Raycaster();
         this.mouse             = new THREE.Vector2();
         this.tablePlane        = new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.ballRadius);
@@ -41,7 +40,7 @@ export class SimulationApp {
         this.ballInHandGhost        = null;
         this.ballInHandPlacementValid = true;
 
-        this.physicsWorld.registerExternalForce(new WindBlowForce());
+        // this.physicsWorld.registerExternalForce(new WindBlowForce());
         this.physicsWorld.registerExternalForce(new MagneticCueBallForce());
 
         this.tableGraphics = new TableGraphics(this);
@@ -418,22 +417,18 @@ export class SimulationApp {
     this.gui.domElement.style.right = '10px';
     const config = this.physicsWorld.config;
 
-    // ✅ تعريف المجلد (يجب ألا يكون معلقاً)
     const fStrike = this.gui.addFolder('🏑 التحكم بالعصا والضربة');
 
-    // عناصر التحكم الموجودة
     fStrike.add(config, 'strikeImpulse', 0.1, 3.0, 0.05).name('دفع الضربة (Impulse)');
     fStrike.add(config, 'strikeOffsetX', -0.02, 0.02, 0.001).name('انحراف أفقي (X)');
     fStrike.add(config, 'strikeOffsetY', -0.02, 0.02, 0.001).name('انحراف رأسي (Y)');
 
-    // ✅ عنصر التحكم الجديد للمهلة
     fStrike.add(this, 'SHOT_TIMEOUT', 1.0, 180.0, 0.5).name('⏳ مهلة الضربة (ثانية)');
 
-    // الأزرار
     fStrike.add(this, 'triggerAdvancedStrike').name('🚀 إطلاق القوة');
     fStrike.add(this, 'resetGame').name('🔄 إعادة اللعبة');
 
-    fStrike.open();  // يفتح المجلد تلقائياً
+    fStrike.open();
 
         const fEnv = this.gui.addFolder('🌍 البيئة والاحتكاك');
         fEnv.add(config, 'gravity',       0.0, 25.0,  0.1  ).name('الجاذبية (g)').onChange(v => this.physicsWorld.updateParameters({ gravity: v }));
@@ -633,9 +628,6 @@ export class SimulationApp {
                 const allDone = this.physicsWorld.balls.every(
                     b => b.isSleeping || b.isPocketted
                 );
-                // FIX: timeout 7 ثوانٍ كشبكة أمان ضد أي كرة عالقة لا تنام ولا تُهرَّب
-                // يمنع التجمُّد الأبدي بغض النظر عن سبب المشكلة
-                // const timedOut = this.shotActiveTime > 20.0;
                 const timedOut = this.shotActiveTime > this.SHOT_TIMEOUT;
 
                 if (allDone 
@@ -644,7 +636,6 @@ export class SimulationApp {
                     if (
                         timedOut &&
                          !allDone) {
-                        // أجبر جميع الكرات على النوم قبل التقييم
                         this.physicsWorld.balls.forEach(b => {
                             if (!b.isPocketted) {
                                 b.velocity.set(0, 0, 0);
